@@ -113,7 +113,7 @@ void print_list(cell *list) {
   printf(")");
 }
 
-// program = list*
+// program = expr*  (現状はlist)
 // list = '(' expr* ')'
 // expr = value | symbol | list
 
@@ -184,7 +184,7 @@ expression *eval(expression *exp) {
     return exp;
 
   else if (exp->type == SYMBOL) {
-    fprintf(stderr, "symbol is not implemented yet\n");
+    fprintf(stderr, "symbol evaluation is not implemented yet\n");
     exit(1);
 
   } else if (exp->type == CELL) {
@@ -228,9 +228,11 @@ int main(int argc, char *argv[]) {
   }
 
   cell *list = parse_program(argv[1]);
-  puts("Source code");
-  print_list(list);
-  puts("");
+  if (debug) {
+    puts("Source code");
+    print_list(list);
+    puts("");
+  }
 
   print_expression(eval(make_list_expression(list)));
   puts("");
