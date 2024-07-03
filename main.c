@@ -113,6 +113,36 @@ void print_list(cell *list) {
   printf(")");
 }
 
+typedef struct Frame frame;
+struct Frame {
+  // 親環境へのポインタ(グローバル環境のときはNULL)
+  frame *parent;
+  // ((symbol value) ...)
+  cell *list;
+};
+
+frame *make_frame(frame *parent) {
+  frame *f = (frame *)malloc_e(sizeof(frame));
+  f->parent = parent;
+  f->list = make_empty_list();
+  return f;
+}
+
+expression *find_symbol(frame *env, expression* symbol) {
+  while (env == NULL) {
+    cell *list = env->list->cdr;
+    while (list != NULL) {
+      cell *pair = list->car->body.cell;
+      if (exp_equal(pair->car, symbol))
+        return pair->cdr->car;
+      list = list->cdr;
+    }
+    env = env->parent;
+  }
+  fprintf(stderr, "symbol %s is not found\n", symbol->body.symbol);
+  exit(1);
+}
+
 // program = expr*  (現状はlist)
 // list = '(' expr* ')'
 // expr = value | symbol | list
@@ -178,14 +208,13 @@ cell *parse_program(char *prg) {
   return parse_list();
 }
 
-expression *eval(expression *exp) {
+expression *eval(expression *exp, frame *env) {
   if (exp->type == VALUE)
     // 値はそのまま返す
     return exp;
 
   else if (exp->type == SYMBOL) {
-    fprintf(stderr, "symbol evaluation is not implemented yet\n");
-    exit(1);
+    return find_symbol(env, exp);
 
   } else if (exp->type == CELL) {
     // 最初の要素を取得
@@ -203,7 +232,7 @@ expression *eval(expression *exp) {
       float sum = 0;
       l = l->cdr;
       while (l != NULL) {
-        expression *arg = eval(l->car);
+        expression *arg = eval(l->car, env);
         if (arg->type != VALUE) {
           fprintf(stderr, "operation + is not defined for arguments");
           exit(1);
@@ -234,6 +263,13 @@ int main(int argc, char *argv[]) {
     puts("");
   }
 
-  print_expression(eval(make_list_expression(list)));
+  frame *environment = make_frame(NULL);
+  // frameにaを1として追加
+  cell *pair = make_empty_list();
+  append_list(pair, make_symbol_expression("a"));
+  append_list(pair, make_value_expression(1));
+  append_list(environment->list, make_list_expression(pair));
+
+  print_expression(eval(make_list_expression(list), environment));
   puts("");
 }
