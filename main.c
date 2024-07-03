@@ -87,10 +87,28 @@ cell *make_empty_list() {
   return list;
 }
 
-void append_list(cell *list, expression *expr) {
-  // 最後のセル
+cell *get_first(cell *list) {
+  return list->cdr;
+}
+
+cell *get_last(cell *list) {
   while (list->cdr != NULL)
     list = list->cdr;
+  return list;
+}
+
+cell *get_nth(cell *list, int n) {
+  list = get_first(list);
+  for (int i = 0; i < n; i++) {
+    if (list == NULL)
+      return NULL;
+    list = list->cdr;
+  }
+}
+
+void append_list(cell *list, expression *expr) {
+  // 最後のセルを取得
+  list = get_last(list);
   list->cdr = (cell *)malloc_e(sizeof(cell));
   list = list->cdr;
 
@@ -101,7 +119,7 @@ void append_list(cell *list, expression *expr) {
 
 void print_list(cell *list) {
   // skip dummy cell
-  list = list->cdr;
+  list = get_first(list);
   printf("(");
   while (list != NULL) {
     expression *expr = list->car;
