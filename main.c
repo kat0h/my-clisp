@@ -388,91 +388,90 @@ expression *eval(expression *exp, frame *env) {
     // 関数名から関数を取得
     expression *func = get_nth(list, 0)->car;
     // まだ関数は第一級ではない
-    if (func->type != SYMBOL) {
-      fprintf(stderr, "function name must be symbol\n");
-      exit(1);
-    }
+    if (func->type == SYMBOL) {
+      if (strcmp("begin", func->body.symbol) == 0) {
+        list = list->cdr->cdr;
+        expression *result = make_value_expression(0);
+        while (list != NULL) {
+          result = eval(list->car, env);
+          list = list->cdr;
+        }
+        return result;
 
-    if (strcmp("begin", func->body.symbol) == 0) {
-      list = list->cdr->cdr;
-      expression *result = make_value_expression(0);
-      while (list != NULL) {
-        result = eval(list->car, env);
-        list = list->cdr;
-      }
-      return result;
-
-    } else if (strcmp("lambda", func->body.symbol) == 0) {
-      if (list_len(list) < 3) {
-        fprintf(stderr, "wrong number of arguments lambda expected 2 got %d\n",
-                (int)list_len(list) - 1);
-        exit(1);
-      }
-
-      // lambda式には下記のような定義がある
-      // (lambda (x) x)
-      //    => ((lambda (x) x) 1) => 1
-      //
-      // 未 | (lambda x x)
-      // 実 |    => ((lambda x x) 1 2) => (1 2)
-      // 装 | (lambda (x . y) (print x y))
-      //    |    => ((lambda (x . y) (print x y)) 1 2 3) => 1 (2 3)
-      if (get_nth(list, 1)->car->type != CELL) {
-        fprintf(stderr, "lambda: arguments must be list\n");
-        exit(1);
-      }
-      cell *args = get_nth(list, 1)->car->body.cell;
-      check_is_list(args);
-
-      // 本体
-      cell *body = make_empty_list();
-      body->cdr = get_nth(list, 2);
-
-      expression *l = make_lambda_expression(args, body, env);
-      return l;
-
-    } else if (strcmp("+", func->body.symbol) == 0) {
-      float sum = 0;
-      list = list->cdr->cdr;
-      while (list != NULL) {
-        expression *arg = eval(list->car, env);
-        if (arg->type != VALUE) {
-          fprintf(stderr, "operation + is not defined for arguments");
+      } else if (strcmp("lambda", func->body.symbol) == 0) {
+        if (list_len(list) < 3) {
+          fprintf(stderr,
+                  "wrong number of arguments lambda expected 2 got %d\n",
+                  (int)list_len(list) - 1);
           exit(1);
         }
-        sum += arg->body.value;
-        list = list->cdr;
-      }
-      return make_value_expression(sum);
 
-    } else if (strcmp("trace", func->body.symbol) == 0) {
-      print_frame(env);
-      return make_value_expression(0);
+        // lambda式には下記のような定義がある
+        // (lambda (x) x)
+        //    => ((lambda (x) x) 1) => 1
+        //
+        // 未 | (lambda x x)
+        // 実 |    => ((lambda x x) 1 2) => (1 2)
+        // 装 | (lambda (x . y) (print x y))
+        //    |    => ((lambda (x . y) (print x y)) 1 2 3) => 1 (2 3)
+        if (get_nth(list, 1)->car->type != CELL) {
+          fprintf(stderr, "lambda: arguments must be list\n");
+          exit(1);
+        }
+        cell *args = get_nth(list, 1)->car->body.cell;
+        check_is_list(args);
 
-    } else if (strcmp("define", func->body.symbol) == 0) {
-      int len = list_len(list);
-      if (len != 3) {
-        fprintf(stderr, "wrong number of arguments define expected 2 got %d\n",
-                len - 1);
-        exit(1);
-      }
-      expression *symbol = get_nth(list, 1)->car;
-      expression *value = eval(get_nth(list, 2)->car, env);
-      return define_frame(env, symbol, value);
+        // 本体
+        cell *body = make_empty_list();
+        body->cdr = get_nth(list, 2);
 
-    } else if (strcmp("set!", func->body.symbol) == 0) {
-      int len = list_len(list);
-      if (len != 3) {
-        fprintf(stderr, "wrong number of arguments set! expected 2 got %d\n",
-                len - 1);
-        exit(1);
+        expression *l = make_lambda_expression(args, body, env);
+        return l;
+
+      } else if (strcmp("+", func->body.symbol) == 0) {
+        float sum = 0;
+        list = list->cdr->cdr;
+        while (list != NULL) {
+          expression *arg = eval(list->car, env);
+          if (arg->type != VALUE) {
+            fprintf(stderr, "operation + is not defined for arguments");
+            exit(1);
+          }
+          sum += arg->body.value;
+          list = list->cdr;
+        }
+        return make_value_expression(sum);
+
+      } else if (strcmp("trace", func->body.symbol) == 0) {
+        print_frame(env);
+        return make_value_expression(0);
+
+      } else if (strcmp("define", func->body.symbol) == 0) {
+        int len = list_len(list);
+        if (len != 3) {
+          fprintf(stderr,
+                  "wrong number of arguments define expected 2 got %d\n",
+                  len - 1);
+          exit(1);
+        }
+        expression *symbol = get_nth(list, 1)->car;
+        expression *value = eval(get_nth(list, 2)->car, env);
+        return define_frame(env, symbol, value);
+
+      } else if (strcmp("set!", func->body.symbol) == 0) {
+        int len = list_len(list);
+        if (len != 3) {
+          fprintf(stderr, "wrong number of arguments set! expected 2 got %d\n",
+                  len - 1);
+          exit(1);
+        }
+        expression *symbol = get_nth(list, 1)->car;
+        expression *value = eval(get_nth(list, 2)->car, env);
+        return set_frame(env, symbol, value);
       }
-      expression *symbol = get_nth(list, 1)->car;
-      expression *value = eval(get_nth(list, 2)->car, env);
-      return set_frame(env, symbol, value);
+      fprintf(stderr, "Undefined function %s\n", func->body.symbol);
+      exit(1);
     }
-    fprintf(stderr, "Undefined function %s\n", func->body.symbol);
-    exit(1);
   }
 
   fprintf(stderr, "Unreachable\n");
