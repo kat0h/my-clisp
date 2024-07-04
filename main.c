@@ -24,15 +24,17 @@ void *malloc_e(size_t size) {
 
 typedef struct Expression expression;
 typedef struct Cell cell;
-typedef cell *list;
+typedef struct Lambda lambda;
+typedef struct Frame frame;
 
 struct Expression {
   union {
     float value;
     char *symbol;
     cell *cell;
+    lambda *lmd;
   } body;
-  enum { VALUE, SYMBOL, CELL } type;
+  enum { VALUE, SYMBOL, CELL, LAMBDA } type;
 };
 
 expression *make_value_expression(float value) {
@@ -60,7 +62,38 @@ expression *make_list_expression(cell *list) {
   return expr;
 }
 
+struct Lambda {
+  cell *args;
+  cell *body;
+  frame *env;
+};
+
+expression *make_lambda_expression(cell *args, cell *body, frame *env) {
+  expression *expr = (expression *)malloc_e(sizeof(expression));
+  lambda *lmd = (lambda *)malloc_e(sizeof(lambda));
+  lmd->args = args;
+  lmd->body = body;
+  lmd->env = env;
+  expr->body.lmd = lmd;
+  expr->type = LAMBDA;
+  return expr;
+}
+
 void print_list(cell *list);
+void print_frame(frame *env);
+void print_lambda(expression *expr) {
+  lambda *l = expr->body.lmd;
+  printf("Closure\n");
+  printf("Arguments:\n  ");
+  print_list(l->args);
+  puts("");
+  printf("Body:\n  ");
+  print_list(l->body);
+  puts("");
+  print_frame(l->env);
+}
+
+void print_lambda(expression *expr);
 void print_expression(expression *expr) {
   if (expr->type == VALUE) {
     printf("%f", expr->body.value);
@@ -68,6 +101,8 @@ void print_expression(expression *expr) {
     printf("%s", expr->body.symbol);
   } else if (expr->type == CELL) {
     print_list(expr->body.cell);
+  } else if (expr->type == LAMBDA) {
+    print_lambda(expr);
   }
 }
 
@@ -98,6 +133,7 @@ cell *make_empty_list() {
 
 void check_is_list(cell *list) {
   if (list->car != NULL) {
+    print_list(list);
     fprintf(stderr, "list is not a list\n");
     exit(1);
   }
@@ -163,7 +199,6 @@ void print_list(cell *list) {
   printf(")");
 }
 
-typedef struct Frame frame;
 struct Frame {
   // 親環境へのポインタ(グローバル環境のときはNULL)
   frame *parent;
@@ -346,6 +381,7 @@ expression *eval(expression *exp, frame *env) {
     cell *list = exp->body.cell;
 
     // 空のリストを評価するとリスト
+    // R5RSによると，Schemeで()は妥当な式ではないらしい
     if (list_len(list) == 0)
       return exp;
 
@@ -365,6 +401,35 @@ expression *eval(expression *exp, frame *env) {
         list = list->cdr;
       }
       return result;
+
+    } else if (strcmp("lambda", func->body.symbol) == 0) {
+      if (list_len(list) < 3) {
+        fprintf(stderr, "wrong number of arguments lambda expected 2 got %d\n",
+                (int)list_len(list) - 1);
+        exit(1);
+      }
+
+      // lambda式には下記のような定義がある
+      // (lambda (x) x)
+      //    => ((lambda (x) x) 1) => 1
+      //
+      // 未 | (lambda x x)
+      // 実 |    => ((lambda x x) 1 2) => (1 2)
+      // 装 | (lambda (x . y) (print x y))
+      //    |    => ((lambda (x . y) (print x y)) 1 2 3) => 1 (2 3)
+      if (get_nth(list, 1)->car->type != CELL) {
+        fprintf(stderr, "lambda: arguments must be list\n");
+        exit(1);
+      }
+      cell *args = get_nth(list, 1)->car->body.cell;
+      check_is_list(args);
+
+      // 本体
+      cell *body = make_empty_list();
+      body->cdr = get_nth(list, 2);
+
+      expression *l = make_lambda_expression(args, body, env);
+      return l;
 
     } else if (strcmp("+", func->body.symbol) == 0) {
       float sum = 0;
@@ -421,16 +486,6 @@ int main(int argc, char *argv[]) {
   }
 
   frame *environment = make_frame(NULL);
-  // define_frame(environment, make_symbol_expression("a"),
-  //              make_value_expression(0));
-  // define_frame(environment, make_symbol_expression("b"),
-  //              make_value_expression(1));
-  // define_frame(environment, make_symbol_expression("a"),
-  //              make_value_expression(2));
-  // frame *child = make_frame(environment);
-  // define_frame(child, make_symbol_expression("c"), make_value_expression(3));
-  //
-  // set_frame(child, make_symbol_expression("a"), make_value_expression(4));
 
   cell *list = parse_program(argv[1]);
   if (debug) {
