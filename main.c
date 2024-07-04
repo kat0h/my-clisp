@@ -88,6 +88,7 @@ cell *make_empty_list() {
   return list;
 }
 
+// リストの先頭がダミーかどうかをチェック
 cell *get_first(cell *list) {
   return list->cdr;
 }
@@ -158,6 +159,19 @@ cell* find_symbol(cell *kv, expression *symbol) {
     kv = kv->cdr;
   }
   return NULL;
+}
+
+// 環境から変数を取得
+expression *lookup_frame(frame *env, expression *symbol) {
+  cell *pair = find_symbol(env->kv, symbol);
+  if (pair == NULL) {
+    if (env->parent == NULL) {
+      fprintf(stderr, "symbol %s is not defined\n", symbol->body.symbol);
+      exit(1);
+    }
+    return lookup_frame(env->parent, symbol);
+  }
+  return get_nth(pair, 1)->car;
 }
 
 // 現在の環境に変数をセット
@@ -262,7 +276,7 @@ expression *eval(expression *exp, frame *env) {
     return exp;
 
   else if (exp->type == SYMBOL) {
-    fprintf(stderr, "not implemented symbol\n");
+    return lookup_frame(env, exp);
 
   } else if (exp->type == CELL) {
     // 最初の要素を取得
