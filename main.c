@@ -128,12 +128,12 @@ cell *get_nth(cell *list, int n) {
 }
 
 size_t list_len(cell *list) {
-    size_t len = 0;
-    while (list->cdr != NULL) {
-      len++;
-      list = list->cdr;
-    }
-    return len;
+  size_t len = 0;
+  while (list->cdr != NULL) {
+    len++;
+    list = list->cdr;
+  }
+  return len;
 }
 
 void append_list(cell *list, expression *expr) {
@@ -323,7 +323,13 @@ cell *parse_list() {
 
 cell *parse_program(char *prg) {
   input = prg;
-  return parse_list();
+  cell *list = parse_list();
+  if (*input != '\0') {
+    fprintf(stderr, "parser error input is not empty \"%s\"\n", input);
+    exit(1);
+  }
+
+  return list;
 }
 
 expression *eval(expression *exp, frame *env) {
@@ -331,16 +337,17 @@ expression *eval(expression *exp, frame *env) {
     // 値はそのまま返す
     return exp;
 
+  // シンボルから値を引く
   else if (exp->type == SYMBOL) {
     return lookup_frame(env, exp);
 
   } else if (exp->type == CELL) {
     // 最初の要素を取得
     cell *list = exp->body.cell;
-    if (get_first(list) == NULL) {
-      fprintf(stderr, "Empty list\n");
-      exit(1);
-    }
+
+    // 空のリストを評価するとリスト
+    if (list_len(list) == 0)
+      return exp;
 
     // 関数名から関数を取得
     expression *func = get_nth(list, 0)->car;
@@ -378,15 +385,26 @@ expression *eval(expression *exp, frame *env) {
       return make_value_expression(0);
 
     } else if (strcmp("define", func->body.symbol) == 0) {
+      int len = list_len(list);
+      if (len != 3) {
+        fprintf(stderr, "wrong number of arguments define expected 2 got %d\n",
+                len - 1);
+        exit(1);
+      }
       expression *symbol = get_nth(list, 1)->car;
       expression *value = eval(get_nth(list, 2)->car, env);
       return define_frame(env, symbol, value);
 
     } else if (strcmp("set!", func->body.symbol) == 0) {
+      int len = list_len(list);
+      if (len != 3) {
+        fprintf(stderr, "wrong number of arguments set! expected 2 got %d\n",
+                len - 1);
+        exit(1);
+      }
       expression *symbol = get_nth(list, 1)->car;
       expression *value = eval(get_nth(list, 2)->car, env);
       return set_frame(env, symbol, value);
-
     }
     fprintf(stderr, "Undefined function %s\n", func->body.symbol);
     exit(1);
