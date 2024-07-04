@@ -16,6 +16,7 @@ void *malloc_e(size_t size) {
 
 typedef struct Expression expression;
 typedef struct Cell cell;
+typedef cell *list;
 
 struct Expression {
   union {
@@ -104,6 +105,7 @@ cell *get_nth(cell *list, int n) {
       return NULL;
     list = list->cdr;
   }
+  return list;
 }
 
 void append_list(cell *list, expression *expr) {
@@ -136,29 +138,57 @@ struct Frame {
   // 親環境へのポインタ(グローバル環境のときはNULL)
   frame *parent;
   // ((symbol value) ...)
-  cell *list;
+  cell *kv;
 };
 
 frame *make_frame(frame *parent) {
   frame *f = (frame *)malloc_e(sizeof(frame));
   f->parent = parent;
-  f->list = make_empty_list();
+  f->kv = make_empty_list();
   return f;
 }
 
-expression *find_symbol(frame *env, expression* symbol) {
-  while (env == NULL) {
-    cell *list = env->list->cdr;
-    while (list != NULL) {
-      cell *pair = list->car->body.cell;
-      if (exp_equal(pair->car, symbol))
-        return pair->cdr->car;
-      list = list->cdr;
+cell* find_symbol(cell *kv, expression *symbol) {
+  kv = get_first(kv);
+  while (kv != NULL) {
+    cell *pair = kv->car->body.cell;
+    if (exp_equal(get_first(pair)->car, symbol)) {
+      return pair;
     }
-    env = env->parent;
+    kv = kv->cdr;
   }
-  fprintf(stderr, "symbol %s is not found\n", symbol->body.symbol);
-  exit(1);
+  return NULL;
+}
+
+// 現在の環境に変数をセット
+// 値渡し，参照渡し 注意 TODO
+void define_frame(frame *env, expression *symbol, expression *value) {
+  if (symbol->type != SYMBOL) {
+    fprintf(stderr, "define: symbol must be symbol\n");
+    exit(1);
+  }
+  // 既に定義されいているか確認
+  cell *v = find_symbol(env->kv, symbol);
+  if (v == NULL) {
+    // あたらしいペア
+    cell *pair = make_empty_list();
+    append_list(pair, symbol);
+    append_list(pair, value);
+    append_list(env->kv, make_list_expression(pair));
+  } else {
+    v = get_first(v);
+    v->cdr->car = value;
+  }
+}
+
+void print_frame(frame *env) {
+  printf("==stack frame==\n");
+  print_list(env->kv);
+  puts("");
+  if (env->parent != NULL) {
+    printf(" -> \n");
+    print_frame(env->parent);
+  }
 }
 
 // program = expr*  (現状はlist)
@@ -232,7 +262,7 @@ expression *eval(expression *exp, frame *env) {
     return exp;
 
   else if (exp->type == SYMBOL) {
-    return find_symbol(env, exp);
+    fprintf(stderr, "not implemented symbol\n");
 
   } else if (exp->type == CELL) {
     // 最初の要素を取得
@@ -259,6 +289,9 @@ expression *eval(expression *exp, frame *env) {
         l = l->cdr;
       }
       return make_value_expression(sum);
+    } else if (strcmp("trace", func->body.symbol) == 0) {
+      print_frame(env);
+      return make_value_expression(0);
     }
     fprintf(stderr, "Undefined function %s\n", func->body.symbol);
     exit(1);
@@ -282,12 +315,12 @@ int main(int argc, char *argv[]) {
   }
 
   frame *environment = make_frame(NULL);
-  // frameにaを1として追加
-  cell *pair = make_empty_list();
-  append_list(pair, make_symbol_expression("a"));
-  append_list(pair, make_value_expression(1));
-  append_list(environment->list, make_list_expression(pair));
+  define_frame(environment, make_symbol_expression("a"), make_value_expression(0));
+  define_frame(environment, make_symbol_expression("b"), make_value_expression(1));
+  define_frame(environment, make_symbol_expression("a"), make_value_expression(2));
 
-  print_expression(eval(make_list_expression(list), environment));
+  expression *result = eval(make_list_expression(list), environment);
+  printf("=> ");
+  print_expression(result);
   puts("");
 }
