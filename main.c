@@ -88,16 +88,28 @@ cell *make_empty_list() {
   return list;
 }
 
+void check_is_list(cell *list) {
+  if (list->car != NULL) {
+    fprintf(stderr, "list is not a list\n");
+    exit(1);
+  }
+}
+
 // リストの先頭がダミーかどうかをチェック
-cell *get_first(cell *list) { return list->cdr; }
+cell *get_first(cell *list) {
+  check_is_list(list);
+  return list->cdr;
+}
 
 cell *get_last(cell *list) {
+  check_is_list(list);
   while (list->cdr != NULL)
     list = list->cdr;
   return list;
 }
 
 cell *get_nth(cell *list, int n) {
+  check_is_list(list);
   list = get_first(list);
   for (int i = 0; i < n; i++) {
     if (list == NULL)
@@ -108,6 +120,7 @@ cell *get_nth(cell *list, int n) {
 }
 
 void append_list(cell *list, expression *expr) {
+  check_is_list(list);
   // 最後のセルを取得
   list = get_last(list);
   list->cdr = (cell *)malloc_e(sizeof(cell));
@@ -119,6 +132,7 @@ void append_list(cell *list, expression *expr) {
 }
 
 void print_list(cell *list) {
+  check_is_list(list);
   // skip dummy cell
   list = get_first(list);
   printf("(");
@@ -160,14 +174,13 @@ cell *find_symbol(frame *env, expression *symbol) {
 }
 
 cell *find_symbol_recursive(frame *env, expression *symbol) {
-loop:
-  if (env == NULL)
-    return NULL;
-  cell *pair = find_symbol(env, symbol);
-  if (pair != NULL)
-    return pair;
-  env = env->parent;
-  goto loop;
+  while (env != NULL) {
+    cell *pair = find_symbol(env, symbol);
+    if (pair != NULL)
+      return pair;
+    env = env->parent;
+  }
+  return NULL;
 }
 
 // 環境から変数を取得
@@ -218,11 +231,11 @@ expression *set_frame(frame *env, expression *symbol, expression *value) {
 }
 
 void _print_frame(frame *env) {
-  printf("  ");
-  print_list(env->kv);
-  puts("");
-  if (env->parent != NULL) {
-    _print_frame(env->parent);
+  while (env != NULL) {
+    printf("  ");
+    print_list(env->kv);
+    puts("");
+    env = env->parent;
   }
 }
 
@@ -329,6 +342,7 @@ expression *eval(expression *exp, frame *env) {
         l = l->cdr;
       }
       return make_value_expression(sum);
+
     } else if (strcmp("trace", func->body.symbol) == 0) {
       print_frame(env);
       return make_value_expression(0);
