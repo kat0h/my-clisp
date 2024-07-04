@@ -89,9 +89,7 @@ cell *make_empty_list() {
 }
 
 // リストの先頭がダミーかどうかをチェック
-cell *get_first(cell *list) {
-  return list->cdr;
-}
+cell *get_first(cell *list) { return list->cdr; }
 
 cell *get_last(cell *list) {
   while (list->cdr != NULL)
@@ -149,8 +147,8 @@ frame *make_frame(frame *parent) {
   return f;
 }
 
-cell* find_symbol(cell *kv, expression *symbol) {
-  kv = get_first(kv);
+cell *find_symbol(frame *env, expression *symbol) {
+  cell *kv = get_first(env->kv);
   while (kv != NULL) {
     cell *pair = kv->car->body.cell;
     if (exp_equal(get_first(pair)->car, symbol)) {
@@ -161,28 +159,36 @@ cell* find_symbol(cell *kv, expression *symbol) {
   return NULL;
 }
 
+cell *find_symbol_recursive(frame *env, expression *symbol) {
+loop:
+  if (env == NULL)
+    return NULL;
+  cell *pair = find_symbol(env, symbol);
+  if (pair != NULL)
+    return pair;
+  env = env->parent;
+  goto loop;
+}
+
 // 環境から変数を取得
 expression *lookup_frame(frame *env, expression *symbol) {
-  cell *pair = find_symbol(env->kv, symbol);
+  cell *pair = find_symbol_recursive(env, symbol);
   if (pair == NULL) {
-    if (env->parent == NULL) {
-      fprintf(stderr, "symbol %s is not defined\n", symbol->body.symbol);
-      exit(1);
-    }
-    return lookup_frame(env->parent, symbol);
+    fprintf(stderr, "symbol %s is not defined\n", symbol->body.symbol);
+    exit(1);
   }
   return get_nth(pair, 1)->car;
 }
 
 // 現在の環境に変数をセット
 // 値渡し，参照渡し 注意 TODO
-void define_frame(frame *env, expression *symbol, expression *value) {
+expression *define_frame(frame *env, expression *symbol, expression *value) {
   if (symbol->type != SYMBOL) {
     fprintf(stderr, "define: symbol must be symbol\n");
     exit(1);
   }
   // 既に定義されいているか確認
-  cell *v = find_symbol(env->kv, symbol);
+  cell *v = find_symbol(env, symbol);
   if (v == NULL) {
     // あたらしいペア
     cell *pair = make_empty_list();
@@ -193,16 +199,36 @@ void define_frame(frame *env, expression *symbol, expression *value) {
     v = get_first(v);
     v->cdr->car = value;
   }
+  return symbol;
 }
 
-void print_frame(frame *env) {
-  printf("==stack frame==\n");
+expression *set_frame(frame *env, expression *symbol, expression *value) {
+  if (symbol->type != SYMBOL) {
+    fprintf(stderr, "set!: symbol must be symbol\n");
+    exit(1);
+  }
+  cell *v = find_symbol_recursive(env, symbol);
+  if (v == NULL) {
+    fprintf(stderr, "symbol %s is not defined\n", symbol->body.symbol);
+    exit(1);
+  }
+  get_nth(v, 1)->car = value;
+
+  return symbol;
+}
+
+void _print_frame(frame *env) {
+  printf("  ");
   print_list(env->kv);
   puts("");
   if (env->parent != NULL) {
-    printf(" -> \n");
-    print_frame(env->parent);
+    _print_frame(env->parent);
   }
+}
+
+void print_frame(frame *env) {
+  puts("Env");
+  _print_frame(env);
 }
 
 // program = expr*  (現状はlist)
@@ -329,11 +355,20 @@ int main(int argc, char *argv[]) {
   }
 
   frame *environment = make_frame(NULL);
-  define_frame(environment, make_symbol_expression("a"), make_value_expression(0));
-  define_frame(environment, make_symbol_expression("b"), make_value_expression(1));
-  define_frame(environment, make_symbol_expression("a"), make_value_expression(2));
+  define_frame(environment, make_symbol_expression("a"),
+               make_value_expression(0));
+  define_frame(environment, make_symbol_expression("b"),
+               make_value_expression(1));
+  define_frame(environment, make_symbol_expression("a"),
+               make_value_expression(2));
+  frame *child = make_frame(environment);
+  define_frame(child, make_symbol_expression("c"), make_value_expression(3));
 
-  expression *result = eval(make_list_expression(list), environment);
+  set_frame(child, make_symbol_expression("a"), make_value_expression(4));
+
+  print_frame(child);
+
+  expression *result = eval(make_list_expression(list), child);
   printf("=> ");
   print_expression(result);
   puts("");
