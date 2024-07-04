@@ -5,8 +5,16 @@
 #define SYMBOL_LEN_MAX 256
 char debug = 0;
 
+size_t MEMP = 0;
+void *MEM[1000000] = {0};
+
 void *malloc_e(size_t size) {
   void *p = malloc(size);
+  MEM[MEMP++] = p;
+  if (MEMP == 1000000) {
+    fprintf(stderr, "Internal Error malloc_e\n");
+    exit(1);
+  }
   if (p == NULL) {
     fprintf(stderr, "malloc failed\n");
     exit(1);
@@ -320,6 +328,10 @@ expression *eval(expression *exp, frame *env) {
   } else if (exp->type == CELL) {
     // 最初の要素を取得
     cell *l = exp->body.cell->cdr;
+    if (l == NULL) {
+      fprintf(stderr, "Empty list\n");
+      exit(1);
+    }
 
     // 関数名から関数を取得
     expression *func = l->car;
@@ -361,13 +373,6 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  cell *list = parse_program(argv[1]);
-  if (debug) {
-    puts("Source code");
-    print_list(list);
-    puts("");
-  }
-
   frame *environment = make_frame(NULL);
   define_frame(environment, make_symbol_expression("a"),
                make_value_expression(0));
@@ -381,9 +386,23 @@ int main(int argc, char *argv[]) {
   set_frame(child, make_symbol_expression("a"), make_value_expression(4));
 
   print_frame(child);
+  fflush(stdout);
 
-  expression *result = eval(make_list_expression(list), child);
+  cell *list = parse_program(argv[1]);
+  if (debug) {
+    puts("Source code");
+    print_list(list);
+    puts("");
+  }
+
+  expression *result = eval(make_list_expression(list), environment);
   printf("=> ");
   print_expression(result);
   puts("");
+
+  // MEMとMEMPの内容を表示
+  if (debug)
+    for (int i = 0; i < MEMP; i++) {
+      printf("MEM[%d] = %p\n", i, MEM[i]);
+    }
 }
