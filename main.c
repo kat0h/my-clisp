@@ -127,6 +127,15 @@ cell *get_nth(cell *list, int n) {
   return list;
 }
 
+size_t list_len(cell *list) {
+    size_t len = 0;
+    while (list->cdr != NULL) {
+      len++;
+      list = list->cdr;
+    }
+    return len;
+}
+
 void append_list(cell *list, expression *expr) {
   check_is_list(list);
   // 最後のセルを取得
@@ -327,37 +336,57 @@ expression *eval(expression *exp, frame *env) {
 
   } else if (exp->type == CELL) {
     // 最初の要素を取得
-    cell *l = exp->body.cell->cdr;
-    if (l == NULL) {
+    cell *list = exp->body.cell;
+    if (get_first(list) == NULL) {
       fprintf(stderr, "Empty list\n");
       exit(1);
     }
 
     // 関数名から関数を取得
-    expression *func = l->car;
+    expression *func = get_nth(list, 0)->car;
     // まだ関数は第一級ではない
     if (func->type != SYMBOL) {
       fprintf(stderr, "function name must be symbol\n");
       exit(1);
     }
 
-    if (strcmp("+", func->body.symbol) == 0) {
+    if (strcmp("begin", func->body.symbol) == 0) {
+      list = list->cdr->cdr;
+      expression *result = make_value_expression(0);
+      while (list != NULL) {
+        result = eval(list->car, env);
+        list = list->cdr;
+      }
+      return result;
+
+    } else if (strcmp("+", func->body.symbol) == 0) {
       float sum = 0;
-      l = l->cdr;
-      while (l != NULL) {
-        expression *arg = eval(l->car, env);
+      list = list->cdr->cdr;
+      while (list != NULL) {
+        expression *arg = eval(list->car, env);
         if (arg->type != VALUE) {
           fprintf(stderr, "operation + is not defined for arguments");
           exit(1);
         }
         sum += arg->body.value;
-        l = l->cdr;
+        list = list->cdr;
       }
       return make_value_expression(sum);
 
     } else if (strcmp("trace", func->body.symbol) == 0) {
       print_frame(env);
       return make_value_expression(0);
+
+    } else if (strcmp("define", func->body.symbol) == 0) {
+      expression *symbol = get_nth(list, 1)->car;
+      expression *value = eval(get_nth(list, 2)->car, env);
+      return define_frame(env, symbol, value);
+
+    } else if (strcmp("set!", func->body.symbol) == 0) {
+      expression *symbol = get_nth(list, 1)->car;
+      expression *value = eval(get_nth(list, 2)->car, env);
+      return set_frame(env, symbol, value);
+
     }
     fprintf(stderr, "Undefined function %s\n", func->body.symbol);
     exit(1);
@@ -374,19 +403,16 @@ int main(int argc, char *argv[]) {
   }
 
   frame *environment = make_frame(NULL);
-  define_frame(environment, make_symbol_expression("a"),
-               make_value_expression(0));
-  define_frame(environment, make_symbol_expression("b"),
-               make_value_expression(1));
-  define_frame(environment, make_symbol_expression("a"),
-               make_value_expression(2));
-  frame *child = make_frame(environment);
-  define_frame(child, make_symbol_expression("c"), make_value_expression(3));
-
-  set_frame(child, make_symbol_expression("a"), make_value_expression(4));
-
-  print_frame(child);
-  fflush(stdout);
+  // define_frame(environment, make_symbol_expression("a"),
+  //              make_value_expression(0));
+  // define_frame(environment, make_symbol_expression("b"),
+  //              make_value_expression(1));
+  // define_frame(environment, make_symbol_expression("a"),
+  //              make_value_expression(2));
+  // frame *child = make_frame(environment);
+  // define_frame(child, make_symbol_expression("c"), make_value_expression(3));
+  //
+  // set_frame(child, make_symbol_expression("a"), make_value_expression(4));
 
   cell *list = parse_program(argv[1]);
   if (debug) {
@@ -405,4 +431,8 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < MEMP; i++) {
       printf("MEM[%d] = %p\n", i, MEM[i]);
     }
+
+  for (int i = 0; i < MEMP; i++) {
+    free(MEM[i]);
+  }
 }
