@@ -4,6 +4,7 @@
 #include <string.h>
 
 #define SYMBOL_LEN_MAX 256
+// #define DEBUG
 
 // utils
 // https://github.com/tadd/my-c-lisp
@@ -199,22 +200,30 @@ expr *define_to_env(frame *env, char *symbol, expr *value) {
   add_kv_to_frame(env, symbol, value);
   return mk_symbol_expr(symbol);
 }
+expr *set_to_env(frame *env, char *symbol, expr *value) {
+  kv *i = find_pair_recursive(env, symbol);
+  if (i ==NULL)
+    throw("symbol %s not found", symbol);
+  i->value = value;
+  return mk_symbol_expr(symbol);
+}
 expr *lookup_frame(frame *env, char *symbol) {
   kv *v = find_pair_recursive(env, symbol);
   return v->value;
 }
 void print_frame(frame *env) {
-  if (env == NULL)
-    return;
-  puts("....Frame....");
-  kv *i = env->kv;
-  while (i != NULL) {
-    printf("%s: ", i->key);
-    print_expr(i->value);
-    puts("");
-    i = i->next;
+  while (env != NULL) {
+    puts("....Frame...........................................");
+    kv *i = env->kv;
+    while (i != NULL) {
+      printf("  %s: ", i->key);
+      print_expr(i->value);
+      puts("");
+      i = i->next;
+    }
+    env = env->parent;
   }
-  print_frame(env->parent);
+  puts("....................................................\n");
 }
 
 // parser
@@ -226,11 +235,13 @@ void skip_ws() {
 int is_symbol_char() {
   return ('a' <= *input && *input <= 'z') || ('A' <= *input && *input <= 'Z') ||
          *input == '_' || *input == '!' || *input == '+' || *input == '-' ||
-         *input == '*' || *input == '/';
+         *input == '*' || *input == '/' || ('0' <= *input && *input <= '9');
 }
 expr *parse_list();
 expr *parse_expr() {
+#ifdef DEBUG
   printf("parse_expr: %s\n", input);
+#endif
   // numeber
   if ('0' <= *input && *input <= '9') {
     return mk_number_expr(strtof(input, &input));
@@ -253,7 +264,9 @@ expr *parse_expr() {
   throw("Unexpected expression '%c' \"%s\"", *input, input);
 }
 expr *parse_list() {
+#ifdef DEBUG
   printf("parse_list: %s\n", input);
+#endif
   skip_ws();
   if (*input == ')') {
     input++;
@@ -270,7 +283,9 @@ expr *parse_list() {
   return e;
 }
 expr *parse_paren() {
+#ifdef DEBUG
   printf("parse_paren: %s\n", input);
+#endif
   if (*input == '(') {
     input++;
     skip_ws();
@@ -281,7 +296,9 @@ expr *parse_paren() {
   throw("Unexpected token %c", *input);
 }
 expr *parse_program(char *prg) {
+#ifdef DEBUG
   printf("parse_program: %s\n", prg);
+#endif
   input = prg;
   skip_ws();
   expr *e;
@@ -343,7 +360,7 @@ expr *eval_cell(expr *exp, frame *env) {
       throw("eval error: args is not CELL");
     return eval_lambda(E_LAMBDA(func), E_CELL(args), env);
   }
-  throw("Unreachable");
+  throw("call error: not callable");
 }
 expr *eval_lambda(lambda *f, cell *args, frame *env) {
   frame *newenv = make_frame(f->env);
@@ -354,7 +371,7 @@ expr *eval_lambda(lambda *f, cell *args, frame *env) {
     throw("lambda error: argument count mismatch expect %d but got %d", fargc,
           argc);
   while (fargs != NULL) {
-    add_kv_to_frame(env, E_SYMBOL(fargs->car), eval(args->car, env));
+    add_kv_to_frame(newenv, E_SYMBOL(fargs->car), eval(args->car, env));
     fargs = E_CELL(fargs->cdr);
     args = E_CELL(args->cdr);
   }
@@ -400,6 +417,24 @@ expr *ifunc_define(expr *args, frame *env) {
   }
   return define_to_env(env, symbol, value);
 }
+expr *ifunc_setbang(expr *args, frame *env) {
+  if (E_CELL(args) == NULL) {
+    throw("define error: no symbol");
+  }
+  if (E_CELL(args)->car->type != SYMBOL) {
+    throw("define error: symbol is not symbol");
+  }
+  char *symbol = E_SYMBOL(E_CELL(args)->car);
+  args = E_CELL(args)->cdr;
+  if (E_CELL(args) == NULL) {
+    throw("define error: too few arguments");
+  }
+  expr *value = eval(E_CELL(args)->car, env);
+  if (E_CELL(E_CELL(args)->cdr) != NULL) {
+    throw("define error: too many arguments");
+  }
+  return set_to_env(env, symbol, value);
+}
 expr *ifunc_showenv(expr *args, frame *env) {
   if (E_CELL(args) != NULL) {
     throw("showenv error: too many arguments");
@@ -435,6 +470,14 @@ expr *ifunc_lambda(expr *args, frame *env) {
     throw("lambda error: too many body");
   return mk_lambda_expr(largs, body, env);
 }
+expr *ifunc_print(expr *args, frame *env) {
+  while (E_CELL(args) != NULL) {
+    print_expr(eval(E_CELL(args)->car, env));
+    puts("");
+    args = E_CELL(args)->cdr;
+  }
+  return mk_number_expr(0);
+}
 
 // main
 frame *mk_initial_env() {
@@ -442,8 +485,10 @@ frame *mk_initial_env() {
   add_kv_to_frame(env, "+", mk_ifunc_expr(ifunc_add));
   add_kv_to_frame(env, "begin", mk_ifunc_expr(ifunc_begin));
   add_kv_to_frame(env, "define", mk_ifunc_expr(ifunc_define));
+  add_kv_to_frame(env, "set!", mk_ifunc_expr(ifunc_setbang));
   add_kv_to_frame(env, "showenv", mk_ifunc_expr(ifunc_showenv));
   add_kv_to_frame(env, "lambda", mk_ifunc_expr(ifunc_lambda));
+  add_kv_to_frame(env, "print", mk_ifunc_expr(ifunc_print));
   return env;
 }
 int main(int argc, char *argv[]) {
@@ -457,9 +502,14 @@ int main(int argc, char *argv[]) {
   print_expr(program);
   puts("");
   frame *environ = mk_initial_env();
-  expr *res = eval(program, environ);
+  // expr *res = 
+  eval(program, environ);
   // 評価結果を表示
-  printf("=> ");
-  print_expr(res);
-  puts("");
+  // printf("=> ");
+  // print_expr(res);
+  // puts("");
+  for (int i = 0; i < MEMP; i++) {
+    // printf("MEM[%d] = %p\n", i, MEM[i]);
+    free(MEM[i]);
+  }
 }
