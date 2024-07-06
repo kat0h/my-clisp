@@ -230,6 +230,7 @@ int is_symbol_char() {
 }
 expr *parse_list();
 expr *parse_expr() {
+  printf("parse_expr: %s\n", input);
   // numeber
   if ('0' <= *input && *input <= '9') {
     return mk_number_expr(strtof(input, &input));
@@ -252,6 +253,7 @@ expr *parse_expr() {
   throw("Unexpected expression '%c' \"%s\"", *input, input);
 }
 expr *parse_list() {
+  printf("parse_list: %s\n", input);
   skip_ws();
   if (*input == ')') {
     input++;
@@ -268,6 +270,7 @@ expr *parse_list() {
   return e;
 }
 expr *parse_paren() {
+  printf("parse_paren: %s\n", input);
   if (*input == '(') {
     input++;
     skip_ws();
@@ -278,6 +281,7 @@ expr *parse_paren() {
   throw("Unexpected token %c", *input);
 }
 expr *parse_program(char *prg) {
+  printf("parse_program: %s\n", prg);
   input = prg;
   skip_ws();
   expr *e;
