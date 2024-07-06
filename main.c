@@ -246,7 +246,6 @@ expression *lookup_frame(frame *env, expression *symbol) {
 }
 
 // 現在の環境に変数をセット
-// 値渡し，参照渡し 注意 TODO
 expression *define_frame(frame *env, expression *symbol, expression *value) {
   if (symbol->type != SYMBOL) {
     fprintf(stderr, "define: symbol must be symbol\n");
@@ -387,7 +386,6 @@ expression *eval(expression *exp, frame *env) {
 
     // 関数名から関数を取得
     expression *func = get_nth(list, 0)->car;
-    // まだ関数は第一級ではない
     if (func->type == SYMBOL) {
       if (strcmp("begin", func->body.symbol) == 0) {
         list = list->cdr->cdr;
@@ -474,7 +472,7 @@ expression *eval(expression *exp, frame *env) {
     }
   }
 
-  fprintf(stderr, "Unreachable\n");
+  fprintf(stderr, "can't eval the expression\n");
   exit(1);
 }
 
