@@ -344,12 +344,31 @@ expr *ifunc_begin(expr *args, frame *env) {
   }
   return i;
 }
+expr *ifunc_define(expr *args, frame *env) {
+  if (E_CELL(args) == NULL) {
+    throw("define error: no symbol");
+  }
+  if (E_CELL(args)->car->type != SYMBOL) {
+    throw("define error: symbol is not symbol");
+  }
+  char *symbol = E_SYMBOL(E_CELL(args)->car);
+  args = E_CELL(args)->cdr;
+  if (E_CELL(args) == NULL) {
+    throw("define error: too few arguments");
+  }
+  expr *value = eval(E_CELL(args)->car, env);
+  if (E_CELL(E_CELL(args)->cdr) != NULL) {
+    throw("define error: too many arguments");
+  }
+  return define_to_env(env, symbol, value);
+}
 
 // main
 frame *mk_initial_env() {
   frame *env = make_frame(NULL);
   add_kv_to_frame(env, "+", mk_ifunc_expr(ifunc_add));
   add_kv_to_frame(env, "begin", mk_ifunc_expr(ifunc_begin));
+  add_kv_to_frame(env, "define", mk_ifunc_expr(ifunc_define));
   return env;
 }
 int main(int argc, char *argv[]) {
