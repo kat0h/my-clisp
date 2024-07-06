@@ -252,6 +252,7 @@ expr *parse_expr() {
   throw("Unexpected expression '%c' \"%s\"", *input, input);
 }
 expr *parse_list() {
+  skip_ws();
   if (*input == ')') {
     input++;
     return mk_empty_cell_expr();
@@ -370,7 +371,7 @@ expr *ifunc_add(expr *args, frame *env) {
   return mk_number_expr(sum);
 }
 expr *ifunc_begin(expr *args, frame *env) {
-  expr *i;
+  expr *i = mk_number_expr(0);
   while (E_CELL(args) != NULL) {
     i = eval(E_CELL(args)->car, env);
     args = E_CELL(args)->cdr;
