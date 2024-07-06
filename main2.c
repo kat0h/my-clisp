@@ -134,7 +134,7 @@ expr *mk_cell_expr(expr *car, expr *cdr) {
   e->body.cell->cdr = cdr;
   return e;
 }
-expr *mk_lambda_expr(cell *args, cell *body, frame *env) {
+expr *mk_lambda_expr(cell *args, expr *body, frame *env) {
   expr *e = malloc_e(sizeof(expr));
   e->type = LAMBDA;
   e->body.lmd = malloc_e(sizeof(lambda));
@@ -363,8 +363,43 @@ expr *ifunc_define(expr *args, frame *env) {
   return define_to_env(env, symbol, value);
 }
 expr *ifunc_showenv(expr *args, frame *env) {
+  if (E_CELL(args) != NULL) {
+    throw("showenv error: too many arguments");
+  }
   print_frame(env);
   return mk_number_expr(0);
+}
+int check_args(expr *args) {
+  // argsはリストでないとならない
+  if (args->type != CELL)
+    return 0;
+  // 空のリストはargsとして妥当
+  if (E_CELL(args) == NULL)
+    return 1;
+  // 各要素はSYMBOLでないとならない
+  if (E_CELL(args)->car->type != SYMBOL)
+    return 0;
+  // 残りの要素も再帰的にチェック
+  return check_args(E_CELL(args)->cdr);
+}
+expr *ifunc_lambda(expr *args, frame *env) {
+  // (lambda (args) body)
+  if (E_CELL(args) == NULL) {
+    throw("lambda error: no args");
+  }
+  expr *first = E_CELL(args)->car;
+  if (!check_args(first)) {
+    throw("lambda error: args is not list of symbol");
+  }
+  cell *largs = E_CELL(first);
+  if (E_CELL(E_CELL(args)->cdr) == NULL) {
+    throw("lambda error: no body");
+  }
+  expr *body = E_CELL(E_CELL(args)->cdr)->car;
+  if (E_CELL(E_CELL(E_CELL(args)->cdr)->cdr) != NULL) {
+    throw("lambda error: too many body");
+  }
+  return mk_lambda_expr(largs, body, env);
 }
 
 // main
@@ -374,6 +409,7 @@ frame *mk_initial_env() {
   add_kv_to_frame(env, "begin", mk_ifunc_expr(ifunc_begin));
   add_kv_to_frame(env, "define", mk_ifunc_expr(ifunc_define));
   add_kv_to_frame(env, "showenv", mk_ifunc_expr(ifunc_showenv));
+  add_kv_to_frame(env, "lambda", mk_ifunc_expr(ifunc_lambda));
   return env;
 }
 int main(int argc, char *argv[]) {
