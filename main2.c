@@ -362,6 +362,10 @@ expr *ifunc_define(expr *args, frame *env) {
   }
   return define_to_env(env, symbol, value);
 }
+expr *ifunc_showenv(expr *args, frame *env) {
+  print_frame(env);
+  return mk_number_expr(0);
+}
 
 // main
 frame *mk_initial_env() {
@@ -369,6 +373,7 @@ frame *mk_initial_env() {
   add_kv_to_frame(env, "+", mk_ifunc_expr(ifunc_add));
   add_kv_to_frame(env, "begin", mk_ifunc_expr(ifunc_begin));
   add_kv_to_frame(env, "define", mk_ifunc_expr(ifunc_define));
+  add_kv_to_frame(env, "showenv", mk_ifunc_expr(ifunc_showenv));
   return env;
 }
 int main(int argc, char *argv[]) {
