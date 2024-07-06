@@ -378,12 +378,8 @@ int main(int argc, char *argv[]) {
   }
 
   expr *program = parse_program(argv[1]);
-  printf("Program: ");
-  print_expr(program);
-  puts("");
+  printf("Program: "); print_expr(program); puts("");
   frame *environ = mk_initial_env();
-  // テストの値をframeに追加
-  add_kv_to_frame(environ, "x", mk_number_expr(10));
   expr *res = eval(program, environ);
   // 評価結果を表示
   printf("=> ");
