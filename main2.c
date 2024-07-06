@@ -87,15 +87,15 @@ void print_expr(expr *e) {
     break;
   case CELL: {
     cell *c = E_CELL(e);
-    if (c == NULL)
-      printf("()");
-    else {
-      printf("( ");
+    printf("(");
+    while (c != NULL) {
       print_expr(c->car);
-      printf(" . ");
-      print_expr(c->cdr);
-      printf(" )");
+      if (E_CELL(c->cdr) != NULL) {
+        printf(" ");
+      }
+      c = E_CELL(c->cdr);
     }
+    printf(")");
     break;
   }
   case LAMBDA:
