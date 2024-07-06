@@ -5,25 +5,15 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-echo '=> ()'
+echo "括弧単体の出力"
 ./a.out '()'
 
 echo;echo
 
-echo "Env"
-echo "  ((a 1.000000) (b 2.000000))"
-echo "Env"
-echo "  ((a 3.000000) (b 2.000000))"
-echo "=> 0.000000"
-./a.out '(begin (define a 1) (define b 2) (trace) (set! a 3) (trace))' 
+echo "aは1→3 bは2"
+./a.out '(begin (define a 1) (define b 2) (showenv) (set! a 3) (showenv))' 
 
 echo;echo
 
-echo "=> Closure"
-echo "Arguments:"
-echo "  (x)"
-echo "Body:"
-echo "  (x)"
-echo "Env"
-echo "  ()"
-./a.out '(lambda (x) x)'
+echo "xを引数に取るlambda"
+./a.out '(print (lambda (x) x))'
