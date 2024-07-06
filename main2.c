@@ -8,9 +8,11 @@
 // utils
 // https://github.com/tadd/my-c-lisp
 #define throw(fmt, ...)                                                        \
-  fprintf(stderr, "%s:%d of %s: " fmt "\n", __FILE__, __LINE__,                \
-          __func__ __VA_OPT__(, ) __VA_ARGS__);                                \
-  exit(1)
+  {                                                                            \
+    fprintf(stderr, "%s:%d of %s: " fmt "\n", __FILE__, __LINE__,              \
+            __func__ __VA_OPT__(, ) __VA_ARGS__);                              \
+    exit(1);                                                                   \
+  }
 size_t MEMP = 0;
 void *MEM[1000000] = {0};
 void *malloc_e(size_t size) {
@@ -73,7 +75,7 @@ struct KV {
 #define E_NUMBER(x) (x->body.number)
 #define E_SYMBOL(x) (x->body.symbol)
 #define E_CELL(x) (x->body.cell)
-#define E_LAMBDA(x) (x->body.lambda)
+#define E_LAMBDA(x) (x->body.lmd)
 #define E_IFUNC(x) (x->body.func)
 void print_list(cell *c);
 void print_expr(expr *e) {
@@ -151,6 +153,14 @@ expr *mk_ifunc_expr(ifunc f) {
   e->type = IFUNC;
   e->body.func = f;
   return e;
+}
+int cell_len(cell *c) {
+  int len = 0;
+  while (c != NULL) {
+    len++;
+    c = E_CELL(c->cdr);
+  }
+  return len;
 }
 
 // env
@@ -306,6 +316,7 @@ expr *eval(expr *exp, frame *env) {
   }
   throw("Not implemented");
 }
+expr *eval_lambda(lambda *f, cell *args, frame *env);
 expr *eval_cell(expr *exp, frame *env) {
   if (exp == NULL) {
     throw("eval error: exp is NULL");
@@ -322,8 +333,27 @@ expr *eval_cell(expr *exp, frame *env) {
   expr *args = E_CELL(exp)->cdr;
   if (func->type == IFUNC) {
     return E_IFUNC(func)(args, env);
+  } else if (func->type == LAMBDA) {
+    if (args->type != CELL)
+      throw("eval error: args is not CELL");
+    return eval_lambda(E_LAMBDA(func), E_CELL(args), env);
   }
   throw("Unreachable");
+}
+expr *eval_lambda(lambda *f, cell *args, frame *env) {
+  frame *newenv = make_frame(f->env);
+  cell *fargs = f->args;
+  int fargc = cell_len(fargs);
+  int argc = cell_len(args);
+  if (fargc != argc)
+    throw("lambda error: argument count mismatch expect %d but got %d", fargc,
+          argc);
+  while (fargs != NULL) {
+    add_kv_to_frame(env, E_SYMBOL(fargs->car), eval(args->car, env));
+    fargs = E_CELL(fargs->cdr);
+    args = E_CELL(args->cdr);
+  }
+  return eval(f->body, newenv);
 }
 
 // internal func
@@ -387,21 +417,17 @@ int check_args(expr *args) {
 }
 expr *ifunc_lambda(expr *args, frame *env) {
   // (lambda (args) body)
-  if (E_CELL(args) == NULL) {
+  if (E_CELL(args) == NULL)
     throw("lambda error: no args");
-  }
   expr *first = E_CELL(args)->car;
-  if (!check_args(first)) {
+  if (!check_args(first))
     throw("lambda error: args is not list of symbol");
-  }
   cell *largs = E_CELL(first);
-  if (E_CELL(E_CELL(args)->cdr) == NULL) {
+  if (E_CELL(E_CELL(args)->cdr) == NULL)
     throw("lambda error: no body");
-  }
   expr *body = E_CELL(E_CELL(args)->cdr)->car;
-  if (E_CELL(E_CELL(E_CELL(args)->cdr)->cdr) != NULL) {
+  if (E_CELL(E_CELL(E_CELL(args)->cdr)->cdr) != NULL)
     throw("lambda error: too many body");
-  }
   return mk_lambda_expr(largs, body, env);
 }
 
