@@ -55,7 +55,7 @@ struct Cell {
 };
 struct Lambda {
   cell *args;
-  cell *body;
+  expr *body;
   frame *env;
 };
 // environment
@@ -75,6 +75,7 @@ struct KV {
 #define E_CELL(x) (x->body.cell)
 #define E_LAMBDA(x) (x->body.lambda)
 #define E_IFUNC(x) (x->body.func)
+void print_list(cell *c);
 void print_expr(expr *e) {
   if (e == NULL)
     return;
@@ -85,26 +86,28 @@ void print_expr(expr *e) {
   case SYMBOL:
     printf("%s", E_SYMBOL(e));
     break;
-  case CELL: {
-    cell *c = E_CELL(e);
-    printf("(");
-    while (c != NULL) {
-      print_expr(c->car);
-      if (E_CELL(c->cdr) != NULL) {
-        printf(" ");
-      }
-      c = E_CELL(c->cdr);
-    }
-    printf(")");
+  case CELL:
+    print_list(E_CELL(e));
     break;
-  }
   case LAMBDA:
-    printf("LAMBDA");
+    printf("LAMBDA ");
+    print_list(e->body.lmd->args);
     break;
   case IFUNC:
-    printf("IFUNC");
+    printf("IFUNC %p", E_IFUNC(e));
     break;
   }
+}
+void print_list(cell *c) {
+  printf("(");
+  while (c != NULL) {
+    print_expr(c->car);
+    if (E_CELL(c->cdr) != NULL) {
+      printf(" ");
+    }
+    c = E_CELL(c->cdr);
+  }
+  printf(")");
 }
 expr *mk_number_expr(float number) {
   expr *e = malloc_e(sizeof(expr));
@@ -419,7 +422,9 @@ int main(int argc, char *argv[]) {
   }
 
   expr *program = parse_program(argv[1]);
-  printf("Program: "); print_expr(program); puts("");
+  printf("Program: ");
+  print_expr(program);
+  puts("");
   frame *environ = mk_initial_env();
   expr *res = eval(program, environ);
   // 評価結果を表示
