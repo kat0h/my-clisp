@@ -182,13 +182,9 @@ kv *find_pair_recursive(frame *env, char *symbol) {
     return i;
   return find_pair_recursive(env->parent, symbol);
 }
-expr *define_to_env(frame *env, expr *symbol, expr *value) {
-  // 型チェック
-  if (symbol->type != SYMBOL) {
-    throw("define error: symbol is not symbol");
-  }
-  add_kv_to_frame(env, E_SYMBOL(symbol), value);
-  return symbol;
+expr *define_to_env(frame *env, char *symbol, expr *value) {
+  add_kv_to_frame(env, symbol, value);
+  return mk_symbol_expr(symbol);
 }
 expr *lookup_frame(frame *env, char *symbol) {
   kv *v = find_pair_recursive(env, symbol);
