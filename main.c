@@ -37,19 +37,14 @@ typedef struct KeyVal keyval;
 typedef struct KV kv;
 typedef expr *(*ifunc)(expr *, frame *);
 struct Expr {
-  enum {
-    NUMBER,
-    SYMBOL,
-    CELL,
-    LAMBDA,
-    IFUNC,
-  } type;
+  enum { NUMBER, SYMBOL, CELL, LAMBDA, IFUNC, BOOLEAN } type;
   union {
     float number;
     char *symbol;
     cell *cell;
     lambda *lmd;
     ifunc func;
+    int boolean;
   } body;
 };
 struct Cell {
@@ -78,6 +73,7 @@ struct KV {
 #define E_CELL(x) (x->body.cell)
 #define E_LAMBDA(x) (x->body.lmd)
 #define E_IFUNC(x) (x->body.func)
+#define E_BOOLEAN(x) (x->body.boolean)
 void print_list(cell *c);
 void print_expr(expr *e) {
   if (e == NULL)
@@ -98,6 +94,9 @@ void print_expr(expr *e) {
     break;
   case IFUNC:
     printf("IFUNC %p", E_IFUNC(e));
+    break;
+  case BOOLEAN:
+    printf("%s", E_NUMBER(e) ? "#t" : "#f");
     break;
   }
 }
@@ -129,7 +128,7 @@ expr *mk_symbol_expr(char *symbol) {
 expr *mk_empty_cell_expr() {
   expr *e = xmalloc(sizeof(expr));
   e->type = CELL;
-  E_CELL(e)= NULL;
+  E_CELL(e) = NULL;
   return e;
 }
 expr *mk_cell_expr(expr *car, expr *cdr) {
@@ -147,6 +146,12 @@ expr *mk_lambda_expr(cell *args, expr *body, frame *env) {
   E_LAMBDA(e)->args = args;
   E_LAMBDA(e)->body = body;
   E_LAMBDA(e)->env = env;
+  return e;
+}
+expr *mk_boolean_expr(int b) {
+  expr *e = xmalloc(sizeof(expr));
+  e->type = BOOLEAN;
+  E_BOOLEAN(e) = b;
   return e;
 }
 expr *mk_ifunc_expr(ifunc f) {
@@ -202,7 +207,7 @@ expr *define_to_env(frame *env, char *symbol, expr *value) {
 }
 expr *set_to_env(frame *env, char *symbol, expr *value) {
   kv *i = find_pair_recursive(env, symbol);
-  if (i ==NULL)
+  if (i == NULL)
     throw("symbol %s not found", symbol);
   i->value = value;
   return mk_symbol_expr(symbol);
@@ -237,6 +242,21 @@ int is_symbol_char() {
          *input == '_' || *input == '!' || *input == '+' || *input == '-' ||
          *input == '*' || *input == '/' || ('0' <= *input && *input <= '9');
 }
+expr *parse_hash_literal() {
+  if (*input != '#')
+    throw("parse error: not hash literal");
+  input++;
+  if (*input == 't') {
+    input++;
+    return mk_boolean_expr(1);
+  } else if (*input == 'f') {
+    input++;
+    return mk_boolean_expr(0);
+  } else {
+    throw("parse error: unexpected token %c", *input);
+  }
+  
+}
 expr *parse_list();
 expr *parse_expr() {
 #ifdef DEBUG
@@ -257,6 +277,8 @@ expr *parse_expr() {
     }
     buf[i] = '\0';
     return mk_symbol_expr(buf);
+  } else if (*input == '#') {
+    return parse_hash_literal();
   } else if (*input == '(') {
     input++;
     return parse_list();
@@ -332,8 +354,9 @@ expr *eval(expr *exp, frame *env) {
   case (IFUNC):
     // IFUNCはそれ以上評価できない終端の値
     return exp;
-  default:
-    throw("eval error: unknown type");
+  case (BOOLEAN):
+    // BOOLEANはそれ以上評価できない終端の値
+    return exp;
   }
   throw("Not implemented");
 }
@@ -542,7 +565,7 @@ int main(int argc, char *argv[]) {
   print_expr(program);
   puts("");
   frame *environ = mk_initial_env();
-  // expr *res = 
+  // expr *res =
   eval(program, environ);
   // 評価結果を表示
   // printf("=> ");
