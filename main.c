@@ -326,17 +326,28 @@ expr *parse_paren() {
   }
   throw("Unexpected token %c", *input);
 }
+expr *parse_program_list() {
+#ifdef DEBUG
+  printf("parse_program_list: %s\n", input);
+#endif
+  if (*input == '\0')
+    return mk_empty_cell_expr();
+  expr *e = xmalloc(sizeof(expr));
+  e->type = CELL;
+  E_CELL(e) = xmalloc(sizeof(cell));
+  CAR(e) = parse_paren();
+  skip_ws();
+  CDR(e) = parse_program_list();
+  skip_ws();
+  return e;
+}
 expr *parse_program(char *prg) {
 #ifdef DEBUG
   printf("parse_program: %s\n", prg);
 #endif
   input = prg;
-  skip_ws();
-  expr *e;
-  if (*input == '(')
-    e = parse_paren();
-  else
-    e = parse_expr();
+  expr *e = parse_program_list();
+  e = mk_cell_expr(mk_symbol_expr("begin"), e);
   if (*input != '\0') {
     throw("parser error input is not empty \"%s\"", input);
   }
