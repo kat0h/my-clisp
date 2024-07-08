@@ -557,6 +557,11 @@ expr *ifunc_if(expr *args, frame *env) {
     return eval(CAR(CDR(CDR(args))), env);
   }
 }
+expr *ifunc_quote(expr *args, frame *env) {
+  if (cell_len(E_CELL(args)) != 1)
+    throw("quote error: invalid number of arguments");
+  return eval(CAR(args), env);
+}
 
 // main
 frame *mk_initial_env() {
@@ -572,6 +577,7 @@ frame *mk_initial_env() {
   add_kv_to_frame(env, "lambda", mk_ifunc_expr(ifunc_lambda));
   add_kv_to_frame(env, "print", mk_ifunc_expr(ifunc_print));
   add_kv_to_frame(env, "if", mk_ifunc_expr(ifunc_if));
+  add_kv_to_frame(env, "quote", mk_ifunc_expr(ifunc_quote));
   return env;
 }
 int main(int argc, char *argv[]) {
