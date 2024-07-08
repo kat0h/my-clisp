@@ -94,7 +94,7 @@ void print_expr(expr *e) {
     break;
   case LAMBDA:
     printf("LAMBDA ");
-    print_list(e->body.lmd->args);
+    print_list(E_LAMBDA(e)->args);
     break;
   case IFUNC:
     printf("IFUNC %p", E_IFUNC(e));
@@ -115,7 +115,7 @@ void print_list(cell *c) {
 expr *mk_number_expr(float number) {
   expr *e = malloc_e(sizeof(expr));
   e->type = NUMBER;
-  e->body.number = number;
+  E_NUMBER(e) = number;
   return e;
 }
 expr *mk_symbol_expr(char *symbol) {
@@ -123,36 +123,36 @@ expr *mk_symbol_expr(char *symbol) {
   e->type = SYMBOL;
   char *s = malloc_e(strlen(symbol) + 1);
   strcpy(s, symbol);
-  e->body.symbol = s;
+  E_SYMBOL(e) = s;
   return e;
 }
 expr *mk_empty_cell_expr() {
   expr *e = malloc_e(sizeof(expr));
   e->type = CELL;
-  e->body.cell = NULL;
+  E_CELL(e)= NULL;
   return e;
 }
 expr *mk_cell_expr(expr *car, expr *cdr) {
   expr *e = malloc_e(sizeof(expr));
   e->type = CELL;
-  e->body.cell = malloc_e(sizeof(cell));
-  e->body.cell->car = car;
-  e->body.cell->cdr = cdr;
+  E_CELL(e) = malloc_e(sizeof(cell));
+  E_CELL(e)->car = car;
+  E_CELL(e)->cdr = cdr;
   return e;
 }
 expr *mk_lambda_expr(cell *args, expr *body, frame *env) {
   expr *e = malloc_e(sizeof(expr));
   e->type = LAMBDA;
-  e->body.lmd = malloc_e(sizeof(lambda));
-  e->body.lmd->args = args;
-  e->body.lmd->body = body;
-  e->body.lmd->env = env;
+  E_LAMBDA(e) = malloc_e(sizeof(lambda));
+  E_LAMBDA(e)->args = args;
+  E_LAMBDA(e)->body = body;
+  E_LAMBDA(e)->env = env;
   return e;
 }
 expr *mk_ifunc_expr(ifunc f) {
   expr *e = malloc_e(sizeof(expr));
   e->type = IFUNC;
-  e->body.func = f;
+  E_IFUNC(e) = f;
   return e;
 }
 int cell_len(cell *c) {
@@ -274,11 +274,11 @@ expr *parse_list() {
   }
   expr *e = malloc_e(sizeof(expr));
   e->type = CELL;
-  e->body.cell = malloc_e(sizeof(cell));
+  E_CELL(e) = malloc_e(sizeof(cell));
   skip_ws();
-  e->body.cell->car = parse_expr();
+  E_CELL(e)->car = parse_expr();
   skip_ws();
-  e->body.cell->cdr = parse_list();
+  E_CELL(e)->cdr = parse_list();
   skip_ws();
   return e;
 }
