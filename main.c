@@ -37,7 +37,7 @@ typedef struct KeyVal keyval;
 typedef struct KV kv;
 typedef expr *(*ifunc)(expr *, frame *);
 struct Expr {
-  enum { NUMBER, SYMBOL, CELL, LAMBDA, IFUNC, BOOLEAN } type;
+  enum { NUMBER, SYMBOL, CELL, LAMBDA, IFUNC, BOOLEAN, STRING } type;
   union {
     float number;
     char *symbol;
@@ -45,6 +45,7 @@ struct Expr {
     lambda *lmd;
     ifunc func;
     int boolean;
+    char *string;
   } body;
 };
 struct Cell {
@@ -74,6 +75,7 @@ struct KV {
 #define E_LAMBDA(x) (x->body.lmd)
 #define E_IFUNC(x) (x->body.func)
 #define E_BOOLEAN(x) (x->body.boolean)
+#define E_STRING(x) (x->body.string)
 #define CAR(x) (E_CELL(x)->car)
 #define CDR(x) (E_CELL(x)->cdr)
 void print_list(cell *c);
@@ -99,6 +101,9 @@ void print_expr(expr *e) {
     break;
   case BOOLEAN:
     printf("%s", E_NUMBER(e) ? "#t" : "#f");
+    break;
+  case STRING:
+    printf("%s", E_STRING(e));
     break;
   }
 }
@@ -160,6 +165,14 @@ expr *mk_ifunc_expr(ifunc f) {
   expr *e = xmalloc(sizeof(expr));
   e->type = IFUNC;
   E_IFUNC(e) = f;
+  return e;
+}
+expr *mk_string_expr(char *str) {
+  expr *e = xmalloc(sizeof(expr));
+  e->type = STRING;
+  char *s = xmalloc(strlen(str) + 1);
+  strcpy(s, str);
+  E_STRING(e) = s;
   return e;
 }
 int cell_len(cell *c) {
@@ -287,6 +300,20 @@ expr *parse_expr() {
     }
     buf[i] = '\0';
     return mk_symbol_expr(buf);
+  } else if (*input == '"') {
+    input++;
+    // TODO
+    char buf[SYMBOL_LEN_MAX];
+    int i = 0;
+    while (*input != '"') {
+      buf[i++] = *input++;
+      if (i == SYMBOL_LEN_MAX - 1) {
+        throw("string is too long");
+      }
+    }
+    input++;
+    buf[i] = '\0';
+    return mk_string_expr(buf);
   } else if (*input == '#') {
     return parse_hash_literal();
   } else if (*input == '(') {
@@ -361,22 +388,25 @@ expr *eval(expr *exp, frame *env) {
     throw("eval error: exp is NULL");
   }
   switch (exp->type) {
-  case (NUMBER):
+  case NUMBER:
     // NUMBERはそれ以上評価できない終端の値
     return exp;
-  case (SYMBOL):
+  case SYMBOL:
     // 環境からSYMBOLの値を探す
     return lookup_frame(env, E_SYMBOL(exp));
-  case (CELL):
+  case CELL:
     return eval_cell(exp, env);
-  case (LAMBDA):
+  case LAMBDA:
     // LAMBDAはそれ以上評価できない終端の値
     return exp;
-  case (IFUNC):
+  case IFUNC:
     // IFUNCはそれ以上評価できない終端の値
     return exp;
-  case (BOOLEAN):
+  case BOOLEAN:
     // BOOLEANはそれ以上評価できない終端の値
+    return exp;
+  case STRING:
+    // STRINGはそれ以上評価できない終端の値
     return exp;
   }
   throw("Not implemented");
