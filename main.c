@@ -69,6 +69,7 @@ struct KV {
 };
 
 // expr
+#define TYPEOF(x) (x->type)
 #define E_NUMBER(x) (x->body.number)
 #define E_SYMBOL(x) (x->body.symbol)
 #define E_CELL(x) (x->body.cell)
@@ -82,7 +83,7 @@ void print_list(cell *c);
 void print_expr(expr *e) {
   if (e == NULL)
     return;
-  switch (e->type) {
+  switch (TYPEOF(e)) {
   case NUMBER:
     printf("%f", E_NUMBER(e));
     break;
@@ -120,13 +121,13 @@ void print_list(cell *c) {
 }
 expr *mk_number_expr(float number) {
   expr *e = xmalloc(sizeof(expr));
-  e->type = NUMBER;
+  TYPEOF(e) = NUMBER;
   E_NUMBER(e) = number;
   return e;
 }
 expr *mk_symbol_expr(char *symbol) {
   expr *e = xmalloc(sizeof(expr));
-  e->type = SYMBOL;
+  TYPEOF(e) = SYMBOL;
   char *s = xmalloc(strlen(symbol) + 1);
   strcpy(s, symbol);
   E_SYMBOL(e) = s;
@@ -134,13 +135,13 @@ expr *mk_symbol_expr(char *symbol) {
 }
 expr *mk_empty_cell_expr() {
   expr *e = xmalloc(sizeof(expr));
-  e->type = CELL;
+  TYPEOF(e) = CELL;
   E_CELL(e) = NULL;
   return e;
 }
 expr *mk_cell_expr(expr *car, expr *cdr) {
   expr *e = xmalloc(sizeof(expr));
-  e->type = CELL;
+  TYPEOF(e) = CELL;
   E_CELL(e) = xmalloc(sizeof(cell));
   CAR(e) = car;
   CDR(e) = cdr;
@@ -148,7 +149,7 @@ expr *mk_cell_expr(expr *car, expr *cdr) {
 }
 expr *mk_lambda_expr(cell *args, expr *body, frame *env) {
   expr *e = xmalloc(sizeof(expr));
-  e->type = LAMBDA;
+  TYPEOF(e) = LAMBDA;
   E_LAMBDA(e) = xmalloc(sizeof(lambda));
   E_LAMBDA(e)->args = args;
   E_LAMBDA(e)->body = body;
@@ -157,19 +158,19 @@ expr *mk_lambda_expr(cell *args, expr *body, frame *env) {
 }
 expr *mk_boolean_expr(int b) {
   expr *e = xmalloc(sizeof(expr));
-  e->type = BOOLEAN;
+  TYPEOF(e) = BOOLEAN;
   E_BOOLEAN(e) = b;
   return e;
 }
 expr *mk_ifunc_expr(ifunc f) {
   expr *e = xmalloc(sizeof(expr));
-  e->type = IFUNC;
+  TYPEOF(e) = IFUNC;
   E_IFUNC(e) = f;
   return e;
 }
 expr *mk_string_expr(char *str) {
   expr *e = xmalloc(sizeof(expr));
-  e->type = STRING;
+  TYPEOF(e) = STRING;
   char *s = xmalloc(strlen(str) + 1);
   strcpy(s, str);
   E_STRING(e) = s;
@@ -186,7 +187,7 @@ int cell_len(cell *c) {
 int truish(expr *e) {
   // truish: E → T
   // truish = λε . (ε = false → false, true)
-  if (e->type == BOOLEAN) {
+  if (TYPEOF(e) == BOOLEAN) {
     return E_BOOLEAN(e);
   }
   return 1;
@@ -332,7 +333,7 @@ expr *parse_list() {
     return mk_empty_cell_expr();
   }
   expr *e = xmalloc(sizeof(expr));
-  e->type = CELL;
+  TYPEOF(e) = CELL;
   E_CELL(e) = xmalloc(sizeof(cell));
   CAR(e) = parse_expr();
   skip_ws();
@@ -360,7 +361,7 @@ expr *parse_program_list() {
   if (*input == '\0')
     return mk_empty_cell_expr();
   expr *e = xmalloc(sizeof(expr));
-  e->type = CELL;
+  TYPEOF(e) = CELL;
   E_CELL(e) = xmalloc(sizeof(cell));
   CAR(e) = parse_paren();
   skip_ws();
@@ -387,7 +388,7 @@ expr *eval(expr *exp, frame *env) {
   if (exp == NULL) {
     throw("eval error: exp is NULL");
   }
-  switch (exp->type) {
+  switch (TYPEOF(exp)) {
   case NUMBER:
     // NUMBERはそれ以上評価できない終端の値
     return exp;
@@ -416,7 +417,7 @@ expr *eval_cell(expr *exp, frame *env) {
   if (exp == NULL) {
     throw("eval error: exp is NULL");
   }
-  if (exp->type != CELL) {
+  if (TYPEOF(exp) != CELL) {
     throw("eval error: exp is not CELL");
   }
   // 空リストは妥当な式ではない
@@ -426,10 +427,10 @@ expr *eval_cell(expr *exp, frame *env) {
   // 関数を取得
   expr *func = eval(CAR(exp), env);
   expr *args = CDR(exp);
-  if (func->type == IFUNC) {
+  if (TYPEOF(func) == IFUNC) {
     return E_IFUNC(func)(args, env);
-  } else if (func->type == LAMBDA) {
-    if (args->type != CELL)
+  } else if (TYPEOF(func) == LAMBDA) {
+    if (TYPEOF(args) != CELL)
       throw("eval error: args is not CELL");
     return eval_lambda(E_LAMBDA(func), E_CELL(args), env);
   }
@@ -456,7 +457,7 @@ expr *ifunc_add(expr *args, frame *env) {
   float sum = 0;
   while (E_CELL(args) != NULL) {
     expr *i = eval(CAR(args), env);
-    if (i->type != NUMBER) {
+    if (TYPEOF(i) != NUMBER) {
       throw("add error: not number");
     }
     sum += E_NUMBER(i);
@@ -468,7 +469,7 @@ expr *ifunc_sub(expr *args, frame *env) {
   float sum = 0;
   while (E_CELL(args) != NULL) {
     expr *i = eval(CAR(args), env);
-    if (i->type != NUMBER) {
+    if (TYPEOF(i) != NUMBER) {
       throw("sub error: not number");
     }
     sum -= E_NUMBER(i);
@@ -480,7 +481,7 @@ expr *ifunc_mul(expr *args, frame *env) {
   float sum = 0;
   while (E_CELL(args) != NULL) {
     expr *i = eval(CAR(args), env);
-    if (i->type != NUMBER) {
+    if (TYPEOF(i) != NUMBER) {
       throw("mul error: not number");
     }
     sum *= E_NUMBER(i);
@@ -492,7 +493,7 @@ expr *ifunc_div(expr *args, frame *env) {
   float sum = 0;
   while (E_CELL(args) != NULL) {
     expr *i = eval(CAR(args), env);
-    if (i->type != NUMBER) {
+    if (TYPEOF(i) != NUMBER) {
       throw("mul error: not number");
     }
     if (E_NUMBER(i) == 0)
@@ -507,7 +508,7 @@ expr *ifunc_modulo(expr *args, frame *env) {
     throw("modulo error: invalid number of arguments");
   expr *a = eval(CAR(args), env);
   expr *b = eval(CAR(CDR(args)), env);
-  if (a->type != NUMBER || b->type != NUMBER)
+  if (TYPEOF(a) != NUMBER || TYPEOF(b) != NUMBER)
     throw("modulo error: not number");
   int ia = (int)E_NUMBER(a);
   int ib = (int)E_NUMBER(b);
@@ -525,7 +526,7 @@ expr *ifunc_define(expr *args, frame *env) {
   if (E_CELL(args) == NULL) {
     throw("define error: no symbol");
   }
-  if (CAR(args)->type != SYMBOL) {
+  if (TYPEOF(CAR(args)) != SYMBOL) {
     throw("define error: symbol is not symbol");
   }
   char *symbol = E_SYMBOL(CAR(args));
@@ -543,7 +544,7 @@ expr *ifunc_setbang(expr *args, frame *env) {
   if (E_CELL(args) == NULL) {
     throw("define error: no symbol");
   }
-  if (CAR(args)->type != SYMBOL) {
+  if (TYPEOF(CAR(args)) != SYMBOL) {
     throw("define error: symbol is not symbol");
   }
   char *symbol = E_SYMBOL(CAR(args));
@@ -566,13 +567,13 @@ expr *ifunc_showenv(expr *args, frame *env) {
 }
 int check_args(expr *args) {
   // argsはリストでないとならない
-  if (args->type != CELL)
+  if (TYPEOF(args) != CELL)
     return 0;
   // 空のリストはargsとして妥当
   if (E_CELL(args) == NULL)
     return 1;
   // 各要素はSYMBOLでないとならない
-  if (CAR(args)->type != SYMBOL)
+  if (TYPEOF(CAR(args)) != SYMBOL)
     return 0;
   // 残りの要素も再帰的にチェック
   return check_args(CDR(args));
@@ -621,13 +622,13 @@ int comp(expr *args, frame *env, char type) {
   if (len < 2)
     throw("comp error: too few arguments");
   expr *car = eval(CAR(args), env);
-  if (car->type != NUMBER)
+  if (TYPEOF(car) != NUMBER)
     throw("comp error: not number");
   expr *cdr;
   int result = 1;
   for (int i = 0; i < len - 1; i++) {
     cdr = eval(CAR(CDR(args)), env);
-    if (cdr->type != NUMBER)
+    if (TYPEOF(cdr) != NUMBER)
       throw("comp error: not number");
     switch (type) {
     case EQ: // =
