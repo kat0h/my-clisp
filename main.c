@@ -466,7 +466,13 @@ expr *ifunc_add(expr *args, frame *env) {
   return mk_number_expr(sum);
 }
 expr *ifunc_sub(expr *args, frame *env) {
-  float sum = 0;
+  expr *first = eval(CAR(args), env);
+  if (TYPEOF(first) != NUMBER)
+    throw("sub error: not number");
+  float sum = E_NUMBER(first);
+  if (cell_len(E_CELL(args)) == 1)
+    return mk_number_expr(-sum);
+  args = CDR(args);
   while (E_CELL(args) != NULL) {
     expr *i = eval(CAR(args), env);
     if (TYPEOF(i) != NUMBER) {
@@ -728,6 +734,7 @@ int main(int argc, char *argv[]) {
   // printf("=> ");
   // print_expr(res);
   // puts("");
+  printf("malloc count: %ld\n", MEMP);
   for (int i = 0; i < MEMP; i++) {
     // printf("MEM[%d] = %p\n", i, MEM[i]);
     free(MEM[i]);
