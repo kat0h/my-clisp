@@ -250,7 +250,8 @@ void skip_ws() {
 int is_symbol_char() {
   return ('a' <= *input && *input <= 'z') || ('A' <= *input && *input <= 'Z') ||
          *input == '_' || *input == '!' || *input == '+' || *input == '-' ||
-         *input == '*' || *input == '/' || ('0' <= *input && *input <= '9');
+         *input == '=' || *input == '<' || *input == '>' || *input == '*' ||
+         *input == '/' || ('0' <= *input && *input <= '9');
 }
 expr *parse_hash_literal() {
   if (*input != '#')
@@ -562,6 +563,57 @@ expr *ifunc_quote(expr *args, frame *env) {
     throw("quote error: invalid number of arguments");
   return CAR(args);
 }
+enum { EQ = 0, LT, LE, GT, GE };
+int comp(expr *args, frame *env, char type) {
+  int len = cell_len(E_CELL(args));
+  if (len < 2)
+    throw("comp error: too few arguments");
+  expr *car = eval(CAR(args), env);
+  if (car->type != NUMBER)
+    throw("comp error: not number");
+  expr *cdr;
+  int result = 1;
+  for (int i = 0; i < len - 1; i++) {
+    cdr = eval(CAR(CDR(args)), env);
+    if (cdr->type != NUMBER)
+      throw("comp error: not number");
+    switch (type) {
+    case EQ: // =
+      result &= E_NUMBER(car) == E_NUMBER(cdr);
+      break;
+    case LT: // <
+      result &= E_NUMBER(car) < E_NUMBER(cdr);
+      break;
+    case LE: // <=
+      result &= E_NUMBER(car) <= E_NUMBER(cdr);
+      break;
+    case GT: // >
+      result &= E_NUMBER(car) > E_NUMBER(cdr);
+      break;
+    case GE: // >=
+      result &= E_NUMBER(car) >= E_NUMBER(cdr);
+      break;
+    }
+    car = cdr;
+    args = CDR(args);
+  }
+  return result;
+}
+expr *ifunc_eq(expr *args, frame *env) {
+  return mk_boolean_expr(comp(args, env, EQ));
+}
+expr *ifunc_lt(expr *args, frame *env) {
+  return mk_boolean_expr(comp(args, env, LT));
+}
+expr *ifunc_le(expr *args, frame *env) {
+  return mk_boolean_expr(comp(args, env, LE));
+}
+expr *ifunc_gt(expr *args, frame *env) {
+  return mk_boolean_expr(comp(args, env, GT));
+}
+expr *ifunc_ge(expr *args, frame *env) {
+  return mk_boolean_expr(comp(args, env, GE));
+}
 
 // main
 frame *mk_initial_env() {
@@ -578,6 +630,11 @@ frame *mk_initial_env() {
   add_kv_to_frame(env, "print", mk_ifunc_expr(ifunc_print));
   add_kv_to_frame(env, "if", mk_ifunc_expr(ifunc_if));
   add_kv_to_frame(env, "quote", mk_ifunc_expr(ifunc_quote));
+  add_kv_to_frame(env, "=", mk_ifunc_expr(ifunc_eq));
+  add_kv_to_frame(env, "<", mk_ifunc_expr(ifunc_lt));
+  add_kv_to_frame(env, "<=", mk_ifunc_expr(ifunc_le));
+  add_kv_to_frame(env, ">", mk_ifunc_expr(ifunc_gt));
+  add_kv_to_frame(env, ">=", mk_ifunc_expr(ifunc_ge));
   return env;
 }
 int main(int argc, char *argv[]) {
