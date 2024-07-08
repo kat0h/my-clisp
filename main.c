@@ -472,6 +472,17 @@ expr *ifunc_div(expr *args, frame *env) {
   }
   return mk_number_expr(sum);
 }
+expr *ifunc_modulo(expr *args, frame *env) {
+  if (cell_len(E_CELL(args)) != 2)
+    throw("modulo error: invalid number of arguments");
+  expr *a = eval(CAR(args), env);
+  expr *b = eval(CAR(CDR(args)), env);
+  if (a->type != NUMBER || b->type != NUMBER)
+    throw("modulo error: not number");
+  int ia = (int)E_NUMBER(a);
+  int ib = (int)E_NUMBER(b);
+  return mk_number_expr(ia % ib);
+}
 expr *ifunc_begin(expr *args, frame *env) {
   expr *i = mk_number_expr(0);
   while (E_CELL(args) != NULL) {
@@ -633,6 +644,7 @@ frame *mk_initial_env() {
   add_kv_to_frame(env, "-", mk_ifunc_expr(ifunc_sub));
   add_kv_to_frame(env, "*", mk_ifunc_expr(ifunc_mul));
   add_kv_to_frame(env, "/", mk_ifunc_expr(ifunc_div));
+  add_kv_to_frame(env, "modulo", mk_ifunc_expr(ifunc_modulo));
   add_kv_to_frame(env, "begin", mk_ifunc_expr(ifunc_begin));
   add_kv_to_frame(env, "define", mk_ifunc_expr(ifunc_define));
   add_kv_to_frame(env, "set!", mk_ifunc_expr(ifunc_setbang));
