@@ -391,6 +391,44 @@ expr *ifunc_add(expr *args, frame *env) {
   }
   return mk_number_expr(sum);
 }
+expr *ifunc_sub(expr *args, frame *env) {
+  float sum = 0;
+  while (E_CELL(args) != NULL) {
+    expr *i = eval(E_CELL(args)->car, env);
+    if (i->type != NUMBER) {
+      throw("sub error: not number");
+    }
+    sum -= E_NUMBER(i);
+    args = E_CELL(args)->cdr;
+  }
+  return mk_number_expr(sum);
+}
+expr *ifunc_mul(expr *args, frame *env) {
+  float sum = 0;
+  while (E_CELL(args) != NULL) {
+    expr *i = eval(E_CELL(args)->car, env);
+    if (i->type != NUMBER) {
+      throw("mul error: not number");
+    }
+    sum *= E_NUMBER(i);
+    args = E_CELL(args)->cdr;
+  }
+  return mk_number_expr(sum);
+}
+expr *ifunc_div(expr *args, frame *env) {
+  float sum = 0;
+  while (E_CELL(args) != NULL) {
+    expr *i = eval(E_CELL(args)->car, env);
+    if (i->type != NUMBER) {
+      throw("mul error: not number");
+    }
+    if (E_NUMBER(i) == 0)
+      throw("div error: zero division");
+    sum /= E_NUMBER(i);
+    args = E_CELL(args)->cdr;
+  }
+  return mk_number_expr(sum);
+}
 expr *ifunc_begin(expr *args, frame *env) {
   expr *i = mk_number_expr(0);
   while (E_CELL(args) != NULL) {
@@ -483,6 +521,9 @@ expr *ifunc_print(expr *args, frame *env) {
 frame *mk_initial_env() {
   frame *env = make_frame(NULL);
   add_kv_to_frame(env, "+", mk_ifunc_expr(ifunc_add));
+  add_kv_to_frame(env, "-", mk_ifunc_expr(ifunc_sub));
+  add_kv_to_frame(env, "*", mk_ifunc_expr(ifunc_mul));
+  add_kv_to_frame(env, "/", mk_ifunc_expr(ifunc_div));
   add_kv_to_frame(env, "begin", mk_ifunc_expr(ifunc_begin));
   add_kv_to_frame(env, "define", mk_ifunc_expr(ifunc_define));
   add_kv_to_frame(env, "set!", mk_ifunc_expr(ifunc_setbang));
