@@ -275,7 +275,6 @@ expr *parse_list() {
   expr *e = malloc_e(sizeof(expr));
   e->type = CELL;
   E_CELL(e) = malloc_e(sizeof(cell));
-  skip_ws();
   E_CELL(e)->car = parse_expr();
   skip_ws();
   E_CELL(e)->cdr = parse_list();
