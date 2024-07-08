@@ -74,6 +74,8 @@ struct KV {
 #define E_LAMBDA(x) (x->body.lmd)
 #define E_IFUNC(x) (x->body.func)
 #define E_BOOLEAN(x) (x->body.boolean)
+#define CAR(x) (E_CELL(x)->car)
+#define CDR(x) (E_CELL(x)->cdr)
 void print_list(cell *c);
 void print_expr(expr *e) {
   if (e == NULL)
@@ -168,6 +170,14 @@ int cell_len(cell *c) {
   }
   return len;
 }
+int truish(expr *e) {
+  // truish: E → T
+  // truish = λε . (ε = false → false, true)
+  if (e->type == BOOLEAN) {
+    return E_BOOLEAN(e);
+  }
+  return 1;
+}
 
 // env
 frame *make_frame(frame *parent) {
@@ -255,7 +265,6 @@ expr *parse_hash_literal() {
   } else {
     throw("parse error: unexpected token %c", *input);
   }
-  
 }
 expr *parse_list();
 expr *parse_expr() {
@@ -538,6 +547,16 @@ expr *ifunc_print(expr *args, frame *env) {
   }
   return mk_number_expr(0);
 }
+expr *ifunc_if(expr *args, frame *env) {
+  if (cell_len(E_CELL(args)) != 2 && cell_len(E_CELL(args)) != 3)
+    throw("if error: invalid number of arguments");
+  expr *cond = eval(CAR(args), env);
+  if (truish(cond)) {
+    return eval(CAR(CDR(args)), env);
+  } else {
+    return eval(CAR(CDR(CDR(args))), env);
+  }
+}
 
 // main
 frame *mk_initial_env() {
@@ -552,6 +571,7 @@ frame *mk_initial_env() {
   add_kv_to_frame(env, "showenv", mk_ifunc_expr(ifunc_showenv));
   add_kv_to_frame(env, "lambda", mk_ifunc_expr(ifunc_lambda));
   add_kv_to_frame(env, "print", mk_ifunc_expr(ifunc_print));
+  add_kv_to_frame(env, "if", mk_ifunc_expr(ifunc_if));
   return env;
 }
 int main(int argc, char *argv[]) {
