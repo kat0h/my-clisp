@@ -138,7 +138,7 @@ expr *mk_cell_expr(expr *car, expr *cdr) {
   e->type = CELL;
   E_CELL(e) = xmalloc(sizeof(cell));
   CAR(e) = car;
-  E_CELL(e)->cdr = cdr;
+  CDR(e) = cdr;
   return e;
 }
 expr *mk_lambda_expr(cell *args, expr *body, frame *env) {
@@ -309,7 +309,7 @@ expr *parse_list() {
   E_CELL(e) = xmalloc(sizeof(cell));
   CAR(e) = parse_expr();
   skip_ws();
-  E_CELL(e)->cdr = parse_list();
+  CDR(e) = parse_list();
   skip_ws();
   return e;
 }
@@ -395,7 +395,7 @@ expr *eval_cell(expr *exp, frame *env) {
   }
   // 関数を取得
   expr *func = eval(CAR(exp), env);
-  expr *args = E_CELL(exp)->cdr;
+  expr *args = CDR(exp);
   if (func->type == IFUNC) {
     return E_IFUNC(func)(args, env);
   } else if (func->type == LAMBDA) {
