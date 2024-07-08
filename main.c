@@ -666,6 +666,24 @@ expr *ifunc_gt(expr *args, frame *env) {
 expr *ifunc_ge(expr *args, frame *env) {
   return mk_boolean_expr(comp(args, env, GE));
 }
+expr *ifunc_and(expr *args, frame *env) {
+  int result = 1;
+  while (E_CELL(args) != NULL) {
+    int i = truish(eval(CAR(args), env));
+    result &= i;
+    args = CDR(args);
+  }
+  return mk_boolean_expr(result);
+}
+expr *ifunc_or(expr *args, frame *env) {
+  int result = 0;
+  while (E_CELL(args) != NULL) {
+    int i = truish(eval(CAR(args), env));
+    result |= i;
+    args = CDR(args);
+  }
+  return mk_boolean_expr(result);
+}
 
 // main
 frame *mk_initial_env() {
@@ -688,6 +706,8 @@ frame *mk_initial_env() {
   add_kv_to_frame(env, "<=", mk_ifunc_expr(ifunc_le));
   add_kv_to_frame(env, ">", mk_ifunc_expr(ifunc_gt));
   add_kv_to_frame(env, ">=", mk_ifunc_expr(ifunc_ge));
+  add_kv_to_frame(env, "and", mk_ifunc_expr(ifunc_and));
+  add_kv_to_frame(env, "or", mk_ifunc_expr(ifunc_or));
   return env;
 }
 int main(int argc, char *argv[]) {
