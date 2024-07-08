@@ -137,7 +137,7 @@ expr *mk_cell_expr(expr *car, expr *cdr) {
   expr *e = xmalloc(sizeof(expr));
   e->type = CELL;
   E_CELL(e) = xmalloc(sizeof(cell));
-  E_CELL(e)->car = car;
+  CAR(e) = car;
   E_CELL(e)->cdr = cdr;
   return e;
 }
@@ -306,7 +306,7 @@ expr *parse_list() {
   expr *e = xmalloc(sizeof(expr));
   e->type = CELL;
   E_CELL(e) = xmalloc(sizeof(cell));
-  E_CELL(e)->car = parse_expr();
+  CAR(e) = parse_expr();
   skip_ws();
   E_CELL(e)->cdr = parse_list();
   skip_ws();
@@ -382,7 +382,7 @@ expr *eval_cell(expr *exp, frame *env) {
     return exp;
   }
   // 関数を取得
-  expr *func = eval(E_CELL(exp)->car, env);
+  expr *func = eval(CAR(exp), env);
   expr *args = E_CELL(exp)->cdr;
   if (func->type == IFUNC) {
     return E_IFUNC(func)(args, env);
@@ -413,58 +413,58 @@ expr *eval_lambda(lambda *f, cell *args, frame *env) {
 expr *ifunc_add(expr *args, frame *env) {
   float sum = 0;
   while (E_CELL(args) != NULL) {
-    expr *i = eval(E_CELL(args)->car, env);
+    expr *i = eval(CAR(args), env);
     if (i->type != NUMBER) {
       throw("add error: not number");
     }
     sum += E_NUMBER(i);
-    args = E_CELL(args)->cdr;
+    args = CDR(args);
   }
   return mk_number_expr(sum);
 }
 expr *ifunc_sub(expr *args, frame *env) {
   float sum = 0;
   while (E_CELL(args) != NULL) {
-    expr *i = eval(E_CELL(args)->car, env);
+    expr *i = eval(CAR(args), env);
     if (i->type != NUMBER) {
       throw("sub error: not number");
     }
     sum -= E_NUMBER(i);
-    args = E_CELL(args)->cdr;
+    args = CDR(args);
   }
   return mk_number_expr(sum);
 }
 expr *ifunc_mul(expr *args, frame *env) {
   float sum = 0;
   while (E_CELL(args) != NULL) {
-    expr *i = eval(E_CELL(args)->car, env);
+    expr *i = eval(CAR(args), env);
     if (i->type != NUMBER) {
       throw("mul error: not number");
     }
     sum *= E_NUMBER(i);
-    args = E_CELL(args)->cdr;
+    args = CDR(args);
   }
   return mk_number_expr(sum);
 }
 expr *ifunc_div(expr *args, frame *env) {
   float sum = 0;
   while (E_CELL(args) != NULL) {
-    expr *i = eval(E_CELL(args)->car, env);
+    expr *i = eval(CAR(args), env);
     if (i->type != NUMBER) {
       throw("mul error: not number");
     }
     if (E_NUMBER(i) == 0)
       throw("div error: zero division");
     sum /= E_NUMBER(i);
-    args = E_CELL(args)->cdr;
+    args = CDR(args);
   }
   return mk_number_expr(sum);
 }
 expr *ifunc_begin(expr *args, frame *env) {
   expr *i = mk_number_expr(0);
   while (E_CELL(args) != NULL) {
-    i = eval(E_CELL(args)->car, env);
-    args = E_CELL(args)->cdr;
+    i = eval(CAR(args), env);
+    args = CDR(args);
   }
   return i;
 }
@@ -472,16 +472,16 @@ expr *ifunc_define(expr *args, frame *env) {
   if (E_CELL(args) == NULL) {
     throw("define error: no symbol");
   }
-  if (E_CELL(args)->car->type != SYMBOL) {
+  if (CAR(args)->type != SYMBOL) {
     throw("define error: symbol is not symbol");
   }
-  char *symbol = E_SYMBOL(E_CELL(args)->car);
-  args = E_CELL(args)->cdr;
+  char *symbol = E_SYMBOL(CAR(args));
+  args = CDR(args);
   if (E_CELL(args) == NULL) {
     throw("define error: too few arguments");
   }
-  expr *value = eval(E_CELL(args)->car, env);
-  if (E_CELL(E_CELL(args)->cdr) != NULL) {
+  expr *value = eval(CAR(args), env);
+  if (E_CELL(CDR(args)) != NULL) {
     throw("define error: too many arguments");
   }
   return define_to_env(env, symbol, value);
@@ -490,16 +490,16 @@ expr *ifunc_setbang(expr *args, frame *env) {
   if (E_CELL(args) == NULL) {
     throw("define error: no symbol");
   }
-  if (E_CELL(args)->car->type != SYMBOL) {
+  if (CAR(args)->type != SYMBOL) {
     throw("define error: symbol is not symbol");
   }
-  char *symbol = E_SYMBOL(E_CELL(args)->car);
-  args = E_CELL(args)->cdr;
+  char *symbol = E_SYMBOL(CAR(args));
+  args = CDR(args);
   if (E_CELL(args) == NULL) {
     throw("define error: too few arguments");
   }
-  expr *value = eval(E_CELL(args)->car, env);
-  if (E_CELL(E_CELL(args)->cdr) != NULL) {
+  expr *value = eval(CAR(args), env);
+  if (E_CELL(CDR(args)) != NULL) {
     throw("define error: too many arguments");
   }
   return set_to_env(env, symbol, value);
@@ -519,31 +519,31 @@ int check_args(expr *args) {
   if (E_CELL(args) == NULL)
     return 1;
   // 各要素はSYMBOLでないとならない
-  if (E_CELL(args)->car->type != SYMBOL)
+  if (CAR(args)->type != SYMBOL)
     return 0;
   // 残りの要素も再帰的にチェック
-  return check_args(E_CELL(args)->cdr);
+  return check_args(CDR(args));
 }
 expr *ifunc_lambda(expr *args, frame *env) {
   // (lambda (args) body)
   if (E_CELL(args) == NULL)
     throw("lambda error: no args");
-  expr *first = E_CELL(args)->car;
+  expr *first = CAR(args);
   if (!check_args(first))
     throw("lambda error: args is not list of symbol");
   cell *largs = E_CELL(first);
-  if (E_CELL(E_CELL(args)->cdr) == NULL)
+  if (E_CELL(CDR(args)) == NULL)
     throw("lambda error: no body");
-  expr *body = E_CELL(E_CELL(args)->cdr)->car;
-  if (E_CELL(E_CELL(E_CELL(args)->cdr)->cdr) != NULL)
+  expr *body = CAR(CDR(args));
+  if (E_CELL(CDR(CDR(args))) != NULL)
     throw("lambda error: too many body");
   return mk_lambda_expr(largs, body, env);
 }
 expr *ifunc_print(expr *args, frame *env) {
   while (E_CELL(args) != NULL) {
-    print_expr(eval(E_CELL(args)->car, env));
+    print_expr(eval(CAR(args), env));
     puts("");
-    args = E_CELL(args)->cdr;
+    args = CDR(args);
   }
   return mk_number_expr(0);
 }
@@ -560,7 +560,7 @@ expr *ifunc_if(expr *args, frame *env) {
 expr *ifunc_quote(expr *args, frame *env) {
   if (cell_len(E_CELL(args)) != 1)
     throw("quote error: invalid number of arguments");
-  return eval(CAR(args), env);
+  return CAR(args);
 }
 
 // main
