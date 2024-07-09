@@ -674,22 +674,22 @@ expr *ifunc_ge(expr *args, frame *env) {
   return mk_boolean_expr(comp(args, env, GE));
 }
 expr *ifunc_and(expr *args, frame *env) {
-  int result = 1;
   while (E_CELL(args) != NULL) {
     int i = truish(eval(CAR(args), env));
-    result &= i;
+    if (i == 0)
+      return mk_boolean_expr(0);
     args = CDR(args);
   }
-  return mk_boolean_expr(result);
+  return mk_boolean_expr(1);
 }
 expr *ifunc_or(expr *args, frame *env) {
-  int result = 0;
   while (E_CELL(args) != NULL) {
     int i = truish(eval(CAR(args), env));
-    result |= i;
+    if (i)
+      return mk_boolean_expr(1);
     args = CDR(args);
   }
-  return mk_boolean_expr(result);
+  return mk_boolean_expr(0);
 }
 expr *eval_list(expr *args, frame *env, expr *default_value) {
   expr *i = default_value;
