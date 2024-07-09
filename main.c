@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #define SYMBOL_LEN_MAX 256
 // #define DEBUG
@@ -375,7 +376,6 @@ expr *parse_program(char *prg) {
 #endif
   input = prg;
   expr *e = parse_program_list();
-  e = mk_cell_expr(mk_symbol_expr("begin"), e);
   if (*input != '\0') {
     throw("parser error input is not empty \"%s\"", input);
   }
@@ -691,6 +691,40 @@ expr *ifunc_or(expr *args, frame *env) {
   }
   return mk_boolean_expr(result);
 }
+expr *eval_list(expr *args, frame *env, expr *default_value) {
+  expr *i = default_value;
+  while (E_CELL(args) != NULL) {
+    i = eval(CAR(args), env);
+    args = CDR(args);
+  }
+  return i;
+}
+expr *ifunc_cond(expr *args, frame *env) {
+  while (E_CELL(args) != NULL) {
+    // (cond list* (else expr*)?)
+    // list = (expr*)
+    expr *list = CAR(args);
+    if (TYPEOF(list) != CELL)
+      throw("cond error: not list");
+    expr *cond;
+    while (E_CELL(list) != NULL) {
+      if (TYPEOF(CAR(list)) == SYMBOL && strcmp(E_SYMBOL(CAR(list)), "else") == 0) {
+        // elseのあとをチェック
+        if (E_CELL(CDR(args)) != NULL)
+          throw("cond error: else is not last");
+        return eval_list(CDR(list), env, mk_number_expr(0));
+      }
+      cond = eval(CAR(list), env);
+      if (truish(cond))
+        return eval_list(CDR(list), env, cond);
+      else
+        break;
+      list = CDR(list);
+    }
+    args = CDR(args);
+  }
+  return mk_empty_cell_expr();
+}
 
 // main
 frame *mk_initial_env() {
@@ -715,6 +749,7 @@ frame *mk_initial_env() {
   add_kv_to_frame(env, ">=", mk_ifunc_expr(ifunc_ge));
   add_kv_to_frame(env, "and", mk_ifunc_expr(ifunc_and));
   add_kv_to_frame(env, "or", mk_ifunc_expr(ifunc_or));
+  add_kv_to_frame(env, "cond", mk_ifunc_expr(ifunc_cond));
   return env;
 }
 int main(int argc, char *argv[]) {
@@ -729,12 +764,7 @@ int main(int argc, char *argv[]) {
   puts("");
   frame *environ = mk_initial_env();
   // expr *res =
-  eval(program, environ);
-  // 評価結果を表示
-  // printf("=> ");
-  // print_expr(res);
-  // puts("");
-  printf("malloc count: %ld\n", MEMP);
+  eval_list(program, environ, mk_empty_cell_expr());
   for (int i = 0; i < MEMP; i++) {
     // printf("MEM[%d] = %p\n", i, MEM[i]);
     free(MEM[i]);
