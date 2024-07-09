@@ -753,20 +753,10 @@ frame *mk_initial_env() {
   return env;
 }
 int main(int argc, char *argv[]) {
-  if (argc < 2) {
-    throw("Usage: %s <program>", argv[0]);
-    return 1;
-  }
+  if (argc < 2) throw("Usage: %s <program>", argv[0]);
 
   expr *program = parse_program(argv[1]);
-  printf("Program: ");
-  print_expr(program);
-  puts("");
   frame *environ = mk_initial_env();
-  // expr *res =
   eval_list(program, environ, mk_empty_cell_expr());
-  for (int i = 0; i < MEMP; i++) {
-    // printf("MEM[%d] = %p\n", i, MEM[i]);
-    free(MEM[i]);
-  }
+  for (int i = 0; i < MEMP; i++) free(MEM[i]);
 }

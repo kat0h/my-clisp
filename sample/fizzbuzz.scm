@@ -11,6 +11,5 @@
       ((= (modulo n 15) 0) "FizzBuzz")
       ((= (modulo n 3) 0) "Fizz")
       ((= (modulo n 5) 0) "Buzz")
-      (else n)
-      )))
+      (else n))))
 (fizzbuzz 100 1)
