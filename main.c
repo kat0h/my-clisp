@@ -708,7 +708,8 @@ expr *ifunc_cond(expr *args, frame *env) {
       throw("cond error: not list");
     expr *cond;
     while (E_CELL(list) != NULL) {
-      if (TYPEOF(CAR(list)) == SYMBOL && strcmp(E_SYMBOL(CAR(list)), "else") == 0) {
+      if (TYPEOF(CAR(list)) == SYMBOL &&
+          strcmp(E_SYMBOL(CAR(list)), "else") == 0) {
         // elseのあとをチェック
         if (E_CELL(CDR(args)) != NULL)
           throw("cond error: else is not last");
@@ -752,11 +753,37 @@ frame *mk_initial_env() {
   add_kv_to_frame(env, "cond", mk_ifunc_expr(ifunc_cond));
   return env;
 }
-int main(int argc, char *argv[]) {
-  if (argc < 2) throw("Usage: %s <program>", argv[0]);
-
-  expr *program = parse_program(argv[1]);
+void repl() {
+  puts("kat0h's scheme");
+  char buf[1024];
   frame *environ = mk_initial_env();
-  eval_list(program, environ, mk_empty_cell_expr());
-  for (int i = 0; i < MEMP; i++) free(MEM[i]);
+  printf("scm> ");
+  while (fgets(buf, 1024, stdin) != NULL) {
+    input = buf;
+    if (*input == '\n') {
+      printf("scm> ");
+      continue;
+    }
+    expr *program = parse_expr();
+    expr *ret = eval(program, environ);
+    printf("=> ");
+    print_expr(ret);
+    puts("");
+    printf("scm> ");
+  }
+}
+int main(int argc, char *argv[]) {
+  if (argc < 2) {
+    if (isatty(fileno(stdin)))
+      repl();
+    else
+     throw("repl must be run in tty");
+  } else {
+    expr *program = parse_program(argv[1]);
+    frame *environ = mk_initial_env();
+    eval_list(program, environ, mk_empty_cell_expr());
+  }
+
+  for (int i = 0; i < MEMP; i++)
+    free(MEM[i]);
 }
