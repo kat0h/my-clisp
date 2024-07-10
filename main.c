@@ -118,6 +118,11 @@ void print_list(cell *c) {
   printf("(");
   while (c != NULL) {
     print_expr(c->car);
+    if (TYPEOF(c->cdr) != CELL) {
+      printf(" . ");
+      print_expr(c->cdr);
+      break;
+    }
     if (E_CELL(c->cdr) != NULL) {
       printf(" ");
     }
