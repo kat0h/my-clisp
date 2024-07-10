@@ -736,6 +736,13 @@ expr *ifunc_cond(expr *args, frame *env) {
   }
   return mk_empty_cell_expr();
 }
+expr *ifunc_cons(expr *args, frame *env) {
+  if (cell_len(E_CELL(args)) != 2)
+    fprintf(stderr, "cons error: invalid number of arguments");
+  expr *car = eval(CAR(args), env);
+  expr *cdr = eval(CAR(CDR(args)), env);
+  return mk_cell_expr(car, cdr);
+}
 
 // main
 frame *mk_initial_env() {
@@ -761,6 +768,7 @@ frame *mk_initial_env() {
   add_kv_to_frame(env, "and", mk_ifunc_expr(ifunc_and));
   add_kv_to_frame(env, "or", mk_ifunc_expr(ifunc_or));
   add_kv_to_frame(env, "cond", mk_ifunc_expr(ifunc_cond));
+  add_kv_to_frame(env, "cons", mk_ifunc_expr(ifunc_cons));
   return env;
 }
 void repl() {
