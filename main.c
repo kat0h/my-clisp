@@ -85,9 +85,14 @@ void print_expr(expr *e) {
   if (e == NULL)
     return;
   switch (TYPEOF(e)) {
-  case NUMBER:
-    printf("%f", E_NUMBER(e));
+  case NUMBER: {
+    float n = E_NUMBER(e);
+    if (n - (float)(int)n == 0.0)
+      printf("%d", (int)n);
+    else
+      printf("%f", n);
     break;
+  }
   case SYMBOL:
     printf("%s", E_SYMBOL(e));
     break;
