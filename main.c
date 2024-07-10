@@ -795,7 +795,7 @@ int main(int argc, char *argv[]) {
     if (isatty(fileno(stdin)))
       repl();
     else
-     throw("repl must be run in tty");
+      throw("repl must be run in tty");
   } else {
     expr *program = parse_program(argv[1]);
     frame *environ = mk_initial_env();
