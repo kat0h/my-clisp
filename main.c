@@ -4,6 +4,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "continuation.h"
+
 #define SYMBOL_LEN_MAX 256
 // #define DEBUG
 
@@ -19,10 +21,10 @@ size_t MEMP = 0;
 void *MEM[1000000] = {0};
 void *xmalloc(size_t size) {
   void *p = malloc(size);
-  MEM[MEMP++] = p;
-  if (MEMP == 1000000) {
-    throw("Internal Error xmalloc");
-  }
+  // MEM[MEMP++] = p;
+  // if (MEMP == 1000000) {
+  //   throw("Internal Error xmalloc");
+  // }
   if (p == NULL) {
     throw("malloc failed");
   }
@@ -38,7 +40,16 @@ typedef struct KeyVal keyval;
 typedef struct KV kv;
 typedef expr *(*ifunc)(expr *, frame *);
 struct Expr {
-  enum { NUMBER, SYMBOL, CELL, LAMBDA, IFUNC, BOOLEAN, STRING } type;
+  enum {
+    NUMBER,
+    SYMBOL,
+    CELL,
+    LAMBDA,
+    IFUNC,
+    BOOLEAN,
+    STRING,
+    CONTINUATION
+  } type;
   union {
     float number;
     char *symbol;
@@ -47,6 +58,7 @@ struct Expr {
     ifunc func;
     int boolean;
     char *string;
+    continuation *cont;
   } body;
 };
 struct Cell {
@@ -78,6 +90,7 @@ struct KV {
 #define E_IFUNC(x) (x->body.func)
 #define E_BOOLEAN(x) (x->body.boolean)
 #define E_STRING(x) (x->body.string)
+#define E_CONTINUATION(x) (x->body.cont)
 #define CAR(x) (E_CELL(x)->car)
 #define CDR(x) (E_CELL(x)->cdr)
 void print_list(cell *c);
@@ -111,6 +124,9 @@ void print_expr(expr *e) {
     break;
   case STRING:
     printf("%s", E_STRING(e));
+    break;
+  case CONTINUATION:
+    printf("CONTINUATION");
     break;
   }
 }
@@ -185,6 +201,12 @@ expr *mk_string_expr(char *str) {
   char *s = xmalloc(strlen(str) + 1);
   strcpy(s, str);
   E_STRING(e) = s;
+  return e;
+}
+expr *mk_continuation_expr(continuation *cont) {
+  expr *e = xmalloc(sizeof(expr));
+  TYPEOF(e) = CONTINUATION;
+  E_CONTINUATION(e) = cont;
   return e;
 }
 int cell_len(cell *c) {
@@ -419,6 +441,8 @@ expr *eval(expr *exp, frame *env) {
   case STRING:
     // STRINGはそれ以上評価できない終端の値
     return exp;
+  case CONTINUATION:
+    return exp;
   }
   throw("Not implemented");
 }
@@ -443,6 +467,12 @@ expr *eval_cell(expr *exp, frame *env) {
     if (TYPEOF(args) != CELL)
       throw("eval error: args is not CELL");
     return eval_lambda(E_LAMBDA(func), E_CELL(args), env);
+  } else if (TYPEOF(func) == CONTINUATION) {
+    continuation *cont = E_CONTINUATION(func);
+    // 引数の数をチェック
+    if (cell_len(E_CELL(args)) != 1)
+      throw("call/cc error: invalid number of arguments");
+    call_continuation(cont, eval(CAR(args), env));
   }
   throw("call error: not callable");
 }
@@ -743,6 +773,25 @@ expr *ifunc_cons(expr *args, frame *env) {
   expr *cdr = eval(CAR(CDR(args)), env);
   return mk_cell_expr(car, cdr);
 }
+expr *ifunc_callcc(expr *args, frame *env) {
+  if (cell_len(E_CELL(args)) != 1)
+    throw("call/cc error: invalid number of arguments");
+  expr *lmd = eval(CAR(args), env);
+  if (TYPEOF(lmd) != LAMBDA)
+    throw("call/cc error: not lambda");
+  continuation *cont = xmalloc(sizeof(continuation));
+  expr *r = get_continuation(cont);
+  if (r == NULL) {
+    // lambdaにcontinuationを渡して実行
+    return eval_lambda(
+        E_LAMBDA(lmd),
+        E_CELL(mk_cell_expr(mk_continuation_expr(cont), mk_empty_cell_expr())),
+        env);
+  } else {
+    // continuationが呼ばれた場合
+    return r;
+  }
+}
 
 // main
 frame *mk_initial_env() {
@@ -769,6 +818,7 @@ frame *mk_initial_env() {
   add_kv_to_frame(env, "or", mk_ifunc_expr(ifunc_or));
   add_kv_to_frame(env, "cond", mk_ifunc_expr(ifunc_cond));
   add_kv_to_frame(env, "cons", mk_ifunc_expr(ifunc_cons));
+  add_kv_to_frame(env, "call/cc", mk_ifunc_expr(ifunc_callcc));
   return env;
 }
 void repl() {
@@ -791,6 +841,7 @@ void repl() {
   }
 }
 int main(int argc, char *argv[]) {
+  INIT_CONTINUATION();
   if (argc < 2) {
     if (isatty(fileno(stdin)))
       repl();
@@ -802,6 +853,7 @@ int main(int argc, char *argv[]) {
     eval_list(program, environ, mk_empty_cell_expr());
   }
 
+  printf("MEMP: %d\n", (int)MEMP);
   for (int i = 0; i < MEMP; i++)
     free(MEM[i]);
 }
