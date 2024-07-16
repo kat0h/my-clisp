@@ -1,10 +1,10 @@
+#include <alloca.h>
+#include <setjmp.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
-#include "continuation.h"
 
 #define SYMBOL_LEN_MAX 256
 // #define DEBUG
@@ -35,6 +35,7 @@ void *xmalloc(size_t size) {
 typedef struct Expr expr;
 typedef struct Cell cell;
 typedef struct Lambda lambda;
+typedef struct Continuation continuation;
 typedef struct Frame frame;
 typedef struct KeyVal keyval;
 typedef struct KV kv;
@@ -80,6 +81,27 @@ struct KV {
   expr *value;
   kv *next;
 };
+struct Continuation {
+  void *stack;
+  unsigned long stacklen;
+  void *rsp;
+  jmp_buf cont_reg;
+};
+void init_continuation(void *rbp);
+#define GETRSP(rsp) asm volatile("mov %%rsp, %0" : "=r"(rsp));
+#define GETRBP(rbp) asm volatile("mov %%rbp, %0" : "=r"(rbp));
+#define INIT_CONTINUATION()                                                    \
+  {                                                                            \
+    void *main_rbp;                                                            \
+    GETRBP(main_rbp);                                                          \
+    init_continuation(main_rbp);                                               \
+  }
+void *get_continuation(continuation *c);
+void call_continuation(continuation *c, void *expr);
+void free_continuation(continuation *c);
+static void *main_rbp;
+// 継続の返り値を受け渡すための変数
+static void *e_expr;
 
 // expr
 #define TYPEOF(x) (x->type)
@@ -773,6 +795,38 @@ expr *ifunc_cons(expr *args, frame *env) {
   expr *cdr = eval(CAR(CDR(args)), env);
   return mk_cell_expr(car, cdr);
 }
+void init_continuation(void *rbp) { main_rbp = rbp; }
+void *get_continuation(continuation *c) {
+  void *rsp;
+  GETRSP(rsp);
+  c->rsp = rsp;
+  c->stacklen = main_rbp - rsp + 1;
+  c->stack = malloc(sizeof(char) * c->stacklen);
+  char *dst = c->stack;
+  char *src = c->rsp;
+  for (int i = c->stacklen; 0 <= --i;)
+    *dst++ = *src++;
+  if (setjmp(c->cont_reg) == 0)
+    return NULL;
+  else
+    return e_expr;
+}
+void _cc(continuation *c, void *expr) {
+  char *dst = c->rsp;
+  char *src = c->stack;
+  for (int i = c->stacklen; 0 <= --i;)
+    *dst++ = *src++;
+  e_expr = expr;
+  longjmp(c->cont_reg, 1);
+}
+void call_continuation(continuation *c, void *expr) {
+  volatile void *q = 0;
+  do {
+    q = alloca(16);
+  } while (q > c->rsp);
+  _cc(c, expr);
+}
+void free_continuation(continuation *c) { free(c->stack); }
 expr *ifunc_callcc(expr *args, frame *env) {
   if (cell_len(E_CELL(args)) != 1)
     throw("call/cc error: invalid number of arguments");
