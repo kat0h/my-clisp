@@ -846,6 +846,22 @@ expr *ifunc_callcc(expr *args, frame *env) {
     return r;
   }
 }
+expr *ifunc_car(expr *args, frame *env) {
+  if (cell_len(E_CELL(args)) != 1)
+    throw("car error: invalid number of arguments");
+  expr *c = eval(CAR(args), env);
+  if (TYPEOF(c) != CELL)
+    throw("car error: not pair");
+  return CAR(c);
+}
+expr *ifunc_cdr(expr *args, frame *env) {
+  if (cell_len(E_CELL(args)) != 1)
+    throw("car error: invalid number of arguments");
+  expr *c = eval(CAR(args), env);
+  if (TYPEOF(c) != CELL)
+    throw("car error: not pair");
+  return CDR(c);
+}
 
 // main
 frame *mk_initial_env() {
@@ -873,6 +889,8 @@ frame *mk_initial_env() {
   add_kv_to_frame(env, "cond", mk_ifunc_expr(ifunc_cond));
   add_kv_to_frame(env, "cons", mk_ifunc_expr(ifunc_cons));
   add_kv_to_frame(env, "call/cc", mk_ifunc_expr(ifunc_callcc));
+  add_kv_to_frame(env, "car", mk_ifunc_expr(ifunc_car));
+  add_kv_to_frame(env, "cdr", mk_ifunc_expr(ifunc_cdr));
   return env;
 }
 void repl() {
@@ -907,7 +925,6 @@ int main(int argc, char *argv[]) {
     eval_list(program, environ, mk_empty_cell_expr());
   }
 
-  printf("MEMP: %d\n", (int)MEMP);
   for (int i = 0; i < MEMP; i++)
     free(MEM[i]);
 }
