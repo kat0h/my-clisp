@@ -468,6 +468,12 @@ expr *eval(expr *exp, frame *env) {
   }
   throw("Not implemented");
 }
+
+expr *eval_top(expr *exp, frame *env) {
+  INIT_CONTINUATION();
+  return eval(exp, env);
+}
+
 expr *eval_lambda(lambda *f, cell *args, frame *env);
 expr *eval_cell(expr *exp, frame *env) {
   if (exp == NULL) {
@@ -492,8 +498,10 @@ expr *eval_cell(expr *exp, frame *env) {
   } else if (TYPEOF(func) == CONTINUATION) {
     continuation *cont = E_CONTINUATION(func);
     // 引数の数をチェック
-    if (cell_len(E_CELL(args)) != 1)
+    if (cell_len(E_CELL(args)) > 1)
       throw("call/cc error: invalid number of arguments");
+    if (cell_len(E_CELL(args)) == 0)
+      call_continuation(cont, mk_empty_cell_expr());
     call_continuation(cont, eval(CAR(args), env));
   }
   throw("call error: not callable");
@@ -676,6 +684,8 @@ expr *ifunc_if(expr *args, frame *env) {
   if (truish(cond)) {
     return eval(CAR(CDR(args)), env);
   } else {
+    if (cell_len(E_CELL(args)) == 2)
+      return mk_empty_cell_expr();
     return eval(CAR(CDR(CDR(args))), env);
   }
 }
@@ -756,7 +766,7 @@ expr *ifunc_or(expr *args, frame *env) {
 expr *eval_list(expr *args, frame *env, expr *default_value) {
   expr *i = default_value;
   while (E_CELL(args) != NULL) {
-    i = eval(CAR(args), env);
+    i = eval_top(CAR(args), env);
     args = CDR(args);
   }
   return i;
@@ -905,7 +915,7 @@ void repl() {
       continue;
     }
     expr *program = parse_expr();
-    expr *ret = eval(program, environ);
+    expr *ret = eval_top(program, environ);
     printf("=> ");
     print_expr(ret);
     puts("");
@@ -913,7 +923,6 @@ void repl() {
   }
 }
 int main(int argc, char *argv[]) {
-  INIT_CONTINUATION();
   if (argc < 2) {
     if (isatty(fileno(stdin)))
       repl();
