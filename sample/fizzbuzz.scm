@@ -12,4 +12,4 @@
       ((= (modulo n 3) 0) "Fizz")
       ((= (modulo n 5) 0) "Buzz")
       (else n))))
-(fizzbuzz 10 1)
+(fizzbuzz 100 1)
