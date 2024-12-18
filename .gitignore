@@ -1,3 +1,5 @@
 a.out
 tags
 .vscode
+scm
+*.o

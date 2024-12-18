@@ -1,22 +1,15 @@
 #include <alloca.h>
-#include <setjmp.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include "main.h"
+#include "continuation.h"
 
-#define SYMBOL_LEN_MAX 256
 // #define DEBUG
 
 // utils
-// https://github.com/tadd/my-c-lisp
-#define throw(fmt, ...)                                                        \
-  {                                                                            \
-    fprintf(stderr, "%s:%d of %s: " fmt "\n", __FILE__, __LINE__,              \
-            __func__ __VA_OPT__(, ) __VA_ARGS__);                              \
-    exit(1);                                                                   \
-  }
 size_t MEMP = 0;
 void *MEM[1000000] = {0};
 void *xmalloc(size_t size) {
@@ -25,96 +18,13 @@ void *xmalloc(size_t size) {
   // if (MEMP == 1000000) {
   //   throw("Internal Error xmalloc");
   // }
-  if (p == NULL) {
+  if (p == NULL)
     throw("malloc failed");
-  }
   return p;
 }
 
-// types
-typedef struct Expr expr;
-typedef struct Cell cell;
-typedef struct Lambda lambda;
-typedef struct Continuation continuation;
-typedef struct Frame frame;
-typedef struct KeyVal keyval;
-typedef struct KV kv;
-typedef expr *(*ifunc)(expr *, frame *);
-struct Expr {
-  enum {
-    NUMBER,
-    SYMBOL,
-    CELL,
-    LAMBDA,
-    IFUNC,
-    BOOLEAN,
-    STRING,
-    CONTINUATION
-  } type;
-  union {
-    float number;
-    char *symbol;
-    cell *cell;
-    lambda *lmd;
-    ifunc func;
-    int boolean;
-    char *string;
-    continuation *cont;
-  } body;
-};
-struct Cell {
-  expr *car;
-  expr *cdr;
-};
-struct Lambda {
-  cell *args;
-  expr *body;
-  frame *env;
-};
-// environment
-struct Frame {
-  frame *parent;
-  kv *kv;
-};
-struct KV {
-  char *key;
-  expr *value;
-  kv *next;
-};
-struct Continuation {
-  void *stack;
-  unsigned long stacklen;
-  void *rsp;
-  jmp_buf cont_reg;
-};
-void init_continuation(void *rbp);
-#define GETRSP(rsp) asm volatile("mov %%rsp, %0" : "=r"(rsp));
-#define GETRBP(rbp) asm volatile("mov %%rbp, %0" : "=r"(rbp));
-#define INIT_CONTINUATION()                                                    \
-  {                                                                            \
-    void *main_rbp;                                                            \
-    GETRBP(main_rbp);                                                          \
-    init_continuation(main_rbp);                                               \
-  }
-void *get_continuation(continuation *c);
-void call_continuation(continuation *c, void *expr);
-void free_continuation(continuation *c);
-static void *main_rbp;
-// 継続の返り値を受け渡すための変数
-static void *e_expr;
 
 // expr
-#define TYPEOF(x) (x->type)
-#define E_NUMBER(x) (x->body.number)
-#define E_SYMBOL(x) (x->body.symbol)
-#define E_CELL(x) (x->body.cell)
-#define E_LAMBDA(x) (x->body.lmd)
-#define E_IFUNC(x) (x->body.func)
-#define E_BOOLEAN(x) (x->body.boolean)
-#define E_STRING(x) (x->body.string)
-#define E_CONTINUATION(x) (x->body.cont)
-#define CAR(x) (E_CELL(x)->car)
-#define CDR(x) (E_CELL(x)->cdr)
 void print_list(cell *c);
 void print_expr(expr *e) {
   if (e == NULL)
@@ -223,12 +133,6 @@ expr *mk_string_expr(char *str) {
   char *s = xmalloc(strlen(str) + 1);
   strcpy(s, str);
   E_STRING(e) = s;
-  return e;
-}
-expr *mk_continuation_expr(continuation *cont) {
-  expr *e = xmalloc(sizeof(expr));
-  TYPEOF(e) = CONTINUATION;
-  E_CONTINUATION(e) = cont;
   return e;
 }
 int cell_len(cell *c) {
@@ -527,9 +431,8 @@ expr *ifunc_add(expr *args, frame *env) {
   float sum = 0;
   while (E_CELL(args) != NULL) {
     expr *i = eval(CAR(args), env);
-    if (TYPEOF(i) != NUMBER) {
+    if (TYPEOF(i) != NUMBER)
       throw("add error: not number");
-    }
     sum += E_NUMBER(i);
     args = CDR(args);
   }
@@ -545,9 +448,8 @@ expr *ifunc_sub(expr *args, frame *env) {
   args = CDR(args);
   while (E_CELL(args) != NULL) {
     expr *i = eval(CAR(args), env);
-    if (TYPEOF(i) != NUMBER) {
+    if (TYPEOF(i) != NUMBER)
       throw("sub error: not number");
-    }
     sum -= E_NUMBER(i);
     args = CDR(args);
   }
@@ -569,9 +471,8 @@ expr *ifunc_div(expr *args, frame *env) {
   float sum = 0;
   while (E_CELL(args) != NULL) {
     expr *i = eval(CAR(args), env);
-    if (TYPEOF(i) != NUMBER) {
+    if (TYPEOF(i) != NUMBER)
       throw("mul error: not number");
-    }
     if (E_NUMBER(i) == 0)
       throw("div error: zero division");
     sum /= E_NUMBER(i);
@@ -804,57 +705,6 @@ expr *ifunc_cons(expr *args, frame *env) {
   expr *car = eval(CAR(args), env);
   expr *cdr = eval(CAR(CDR(args)), env);
   return mk_cell_expr(car, cdr);
-}
-void init_continuation(void *rbp) { main_rbp = rbp; }
-void *get_continuation(continuation *c) {
-  void *rsp;
-  GETRSP(rsp);
-  c->rsp = rsp;
-  c->stacklen = main_rbp - rsp + 1;
-  c->stack = malloc(sizeof(char) * c->stacklen);
-  char *dst = c->stack;
-  char *src = c->rsp;
-  for (int i = c->stacklen; 0 <= --i;)
-    *dst++ = *src++;
-  if (setjmp(c->cont_reg) == 0)
-    return NULL;
-  else
-    return e_expr;
-}
-void _cc(continuation *c, void *expr) {
-  char *dst = c->rsp;
-  char *src = c->stack;
-  for (int i = c->stacklen; 0 <= --i;)
-    *dst++ = *src++;
-  e_expr = expr;
-  longjmp(c->cont_reg, 1);
-}
-void call_continuation(continuation *c, void *expr) {
-  volatile void *q = 0;
-  do {
-    q = alloca(16);
-  } while (q > c->rsp);
-  _cc(c, expr);
-}
-void free_continuation(continuation *c) { free(c->stack); }
-expr *ifunc_callcc(expr *args, frame *env) {
-  if (cell_len(E_CELL(args)) != 1)
-    throw("call/cc error: invalid number of arguments");
-  expr *lmd = eval(CAR(args), env);
-  if (TYPEOF(lmd) != LAMBDA)
-    throw("call/cc error: not lambda");
-  continuation *cont = xmalloc(sizeof(continuation));
-  expr *r = get_continuation(cont);
-  if (r == NULL) {
-    // lambdaにcontinuationを渡して実行
-    return eval_lambda(
-        E_LAMBDA(lmd),
-        E_CELL(mk_cell_expr(mk_continuation_expr(cont), mk_empty_cell_expr())),
-        env);
-  } else {
-    // continuationが呼ばれた場合
-    return r;
-  }
 }
 expr *ifunc_car(expr *args, frame *env) {
   if (cell_len(E_CELL(args)) != 1)
