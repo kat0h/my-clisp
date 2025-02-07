@@ -11,8 +11,12 @@ struct Continuation {
   jmp_buf cont_reg;
 };
 void init_continuation(void *rbp);
+#ifdef __x86_64__    
 #define GETRSP(rsp) asm volatile("mov %%rsp, %0" : "=r"(rsp));
 #define GETRBP(rbp) asm volatile("mov %%rbp, %0" : "=r"(rbp));
+#else
+#error "ARM is not supported"
+#endif
 #define INIT_CONTINUATION()                                                    \
   {                                                                            \
     void *main_rbp;                                                            \
