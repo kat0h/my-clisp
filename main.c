@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 #include "main.h"
 #include "continuation.h"
 
@@ -456,7 +457,7 @@ expr *ifunc_sub(expr *args, frame *env) {
   return mk_number_expr(sum);
 }
 expr *ifunc_mul(expr *args, frame *env) {
-  float sum = 0;
+  float sum = 1.0;
   while (E_CELL(args) != NULL) {
     expr *i = eval(CAR(args), env);
     if (TYPEOF(i) != NUMBER) {
@@ -723,6 +724,32 @@ expr *ifunc_cdr(expr *args, frame *env) {
   return CDR(c);
 }
 
+expr *ifunc_rand(expr *args, frame *env) {
+  if (cell_len(E_CELL(args)) != 0) 
+    throw("random error: arg");
+  return mk_number_expr(rand());
+}
+
+expr *ifunc_length(expr *args, frame *env) {
+  if (cell_len(E_CELL(args)) != 1)
+    throw("length error: invalid number of arguments");
+  expr *c = eval(CAR(args), env);
+  if (TYPEOF(c) != CELL)
+    throw("length error: not pair");
+  return mk_number_expr(cell_len(E_CELL(c)));
+}
+
+// プログラムの動作をn秒停止
+expr *ifunc_sleep(expr *args, frame *env) {
+  if (cell_len(E_CELL(args)) != 1)
+    throw("sleep error: invalid number of arguments");
+  expr *c = eval(CAR(args), env);
+  if (TYPEOF(c) != NUMBER)
+    throw("sleep error: not number");
+  sleep(E_NUMBER(c));
+  return mk_number_expr(0);
+}
+
 // main
 frame *mk_initial_env() {
   frame *env = make_frame(NULL);
@@ -751,6 +778,9 @@ frame *mk_initial_env() {
   add_kv_to_frame(env, "call/cc", mk_ifunc_expr(ifunc_callcc));
   add_kv_to_frame(env, "car", mk_ifunc_expr(ifunc_car));
   add_kv_to_frame(env, "cdr", mk_ifunc_expr(ifunc_cdr));
+  add_kv_to_frame(env, "rand", mk_ifunc_expr(ifunc_rand));
+  add_kv_to_frame(env, "length", mk_ifunc_expr(ifunc_length));
+  add_kv_to_frame(env, "sleep", mk_ifunc_expr(ifunc_sleep));
   return env;
 }
 void repl() {
@@ -773,6 +803,7 @@ void repl() {
   }
 }
 int main(int argc, char *argv[]) {
+  srand(time(NULL));
   if (argc < 2) {
     if (isatty(fileno(stdin)))
       repl();
