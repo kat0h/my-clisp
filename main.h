@@ -27,15 +27,15 @@
 
 void *xmalloc(size_t size);
 // types
-typedef struct Expr expr;
+typedef struct Value value;
 typedef struct Cell cell;
 typedef struct Lambda lambda;
 typedef struct Frame frame;
 typedef struct KeyVal keyval;
 typedef struct Continuation continuation;
 typedef struct KV kv;
-typedef expr *(*ifunc)(expr *, frame *);
-struct Expr {
+typedef value *(*ifunc)(value *, frame *);
+struct Value {
   enum {
     NUMBER,
     SYMBOL,
@@ -58,13 +58,13 @@ struct Expr {
   } body;
 };
 struct Cell {
-  expr *car;
-  expr *cdr;
+  value *car;
+  value *cdr;
 };
 int cell_len(cell *c);
 struct Lambda {
   cell *args;
-  expr *body;
+  value *body;
   frame *env;
 };
 // environment
@@ -74,13 +74,13 @@ struct Frame {
 };
 struct KV {
   char *key;
-  expr *value;
+  value *value;
   kv *next;
 };
 
-expr *eval(expr *exp, frame *env);
-expr *eval_lambda(lambda *f, cell *args, frame *env);
-expr *mk_cell_expr(expr *car, expr *cdr);
-expr *mk_empty_cell_expr();
+value *eval(value *exp, frame *env);
+value *eval_lambda(lambda *f, cell *args, frame *env);
+value *mk_cell_value(value *car, value *cdr);
+value *mk_empty_cell_value();
 
 #endif

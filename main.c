@@ -25,9 +25,8 @@ void *xmalloc(size_t size) {
 }
 
 
-// expr
 void print_list(cell *c);
-void print_expr(expr *e) {
+void print_value(value *e) {
   if (e == NULL)
     return;
   switch (TYPEOF(e)) {
@@ -66,10 +65,10 @@ void print_expr(expr *e) {
 void print_list(cell *c) {
   printf("(");
   while (c != NULL) {
-    print_expr(c->car);
+    print_value(c->car);
     if (TYPEOF(c->cdr) != CELL) {
       printf(" . ");
-      print_expr(c->cdr);
+      print_value(c->cdr);
       break;
     }
     if (E_CELL(c->cdr) != NULL) {
@@ -79,36 +78,36 @@ void print_list(cell *c) {
   }
   printf(")");
 }
-expr *mk_number_expr(float number) {
-  expr *e = xmalloc(sizeof(expr));
+value *mk_number_value(float number) {
+  value *e = xmalloc(sizeof(value));
   TYPEOF(e) = NUMBER;
   E_NUMBER(e) = number;
   return e;
 }
-expr *mk_symbol_expr(char *symbol) {
-  expr *e = xmalloc(sizeof(expr));
+value *mk_symbol_value(char *symbol) {
+  value *e = xmalloc(sizeof(value));
   TYPEOF(e) = SYMBOL;
   char *s = xmalloc(strlen(symbol) + 1);
   strcpy(s, symbol);
   E_SYMBOL(e) = s;
   return e;
 }
-expr *mk_empty_cell_expr() {
-  expr *e = xmalloc(sizeof(expr));
+value *mk_empty_cell_value() {
+  value *e = xmalloc(sizeof(value));
   TYPEOF(e) = CELL;
   E_CELL(e) = NULL;
   return e;
 }
-expr *mk_cell_expr(expr *car, expr *cdr) {
-  expr *e = xmalloc(sizeof(expr));
+value *mk_cell_value(value *car, value *cdr) {
+  value *e = xmalloc(sizeof(value));
   TYPEOF(e) = CELL;
   E_CELL(e) = xmalloc(sizeof(cell));
   CAR(e) = car;
   CDR(e) = cdr;
   return e;
 }
-expr *mk_lambda_expr(cell *args, expr *body, frame *env) {
-  expr *e = xmalloc(sizeof(expr));
+value *mk_lambda_value(cell *args, value *body, frame *env) {
+  value *e = xmalloc(sizeof(value));
   TYPEOF(e) = LAMBDA;
   E_LAMBDA(e) = xmalloc(sizeof(lambda));
   E_LAMBDA(e)->args = args;
@@ -116,20 +115,20 @@ expr *mk_lambda_expr(cell *args, expr *body, frame *env) {
   E_LAMBDA(e)->env = env;
   return e;
 }
-expr *mk_boolean_expr(int b) {
-  expr *e = xmalloc(sizeof(expr));
+value *mk_boolean_value(int b) {
+  value *e = xmalloc(sizeof(value));
   TYPEOF(e) = BOOLEAN;
   E_BOOLEAN(e) = b;
   return e;
 }
-expr *mk_ifunc_expr(ifunc f) {
-  expr *e = xmalloc(sizeof(expr));
+value *mk_ifunc_value(ifunc f) {
+  value *e = xmalloc(sizeof(value));
   TYPEOF(e) = IFUNC;
   E_IFUNC(e) = f;
   return e;
 }
-expr *mk_string_expr(char *str) {
-  expr *e = xmalloc(sizeof(expr));
+value *mk_string_value(char *str) {
+  value *e = xmalloc(sizeof(value));
   TYPEOF(e) = STRING;
   char *s = xmalloc(strlen(str) + 1);
   strcpy(s, str);
@@ -144,7 +143,7 @@ int cell_len(cell *c) {
   }
   return len;
 }
-int truish(expr *e) {
+int truish(value *e) {
   // truish: E → T
   // truish = λε . (ε = false → false, true)
   if (TYPEOF(e) == BOOLEAN) {
@@ -160,7 +159,7 @@ frame *make_frame(frame *parent) {
   f->kv = NULL;
   return f;
 }
-void add_kv_to_frame(frame *env, char *symbol, expr *value) {
+void add_kv_to_frame(frame *env, char *symbol, value *value) {
   kv *i = xmalloc(sizeof(kv));
   i->key = symbol;
   i->value = value;
@@ -185,18 +184,18 @@ kv *find_pair_recursive(frame *env, char *symbol) {
     return i;
   return find_pair_recursive(env->parent, symbol);
 }
-expr *define_to_env(frame *env, char *symbol, expr *value) {
+value *define_to_env(frame *env, char *symbol, value *value) {
   add_kv_to_frame(env, symbol, value);
-  return mk_symbol_expr(symbol);
+  return mk_symbol_value(symbol);
 }
-expr *set_to_env(frame *env, char *symbol, expr *value) {
+value *set_to_env(frame *env, char *symbol, value *value) {
   kv *i = find_pair_recursive(env, symbol);
   if (i == NULL)
     throw("symbol %s not found", symbol);
   i->value = value;
-  return mk_symbol_expr(symbol);
+  return mk_symbol_value(symbol);
 }
-expr *lookup_frame(frame *env, char *symbol) {
+value *lookup_frame(frame *env, char *symbol) {
   kv *v = find_pair_recursive(env, symbol);
   return v->value;
 }
@@ -206,7 +205,7 @@ void print_frame(frame *env) {
     kv *i = env->kv;
     while (i != NULL) {
       printf("  %s: ", i->key);
-      print_expr(i->value);
+      print_value(i->value);
       puts("");
       i = i->next;
     }
@@ -227,28 +226,28 @@ int is_symbol_char() {
          *input == '=' || *input == '<' || *input == '>' || *input == '*' ||
          *input == '/' || ('0' <= *input && *input <= '9');
 }
-expr *parse_hash_literal() {
+value *parse_hash_literal() {
   if (*input != '#')
     throw("parse error: not hash literal");
   input++;
   if (*input == 't') {
     input++;
-    return mk_boolean_expr(1);
+    return mk_boolean_value(1);
   } else if (*input == 'f') {
     input++;
-    return mk_boolean_expr(0);
+    return mk_boolean_value(0);
   } else {
     throw("parse error: unexpected token %c", *input);
   }
 }
-expr *parse_list();
-expr *parse_expr() {
+value *parse_list();
+value *parse_value() {
 #ifdef DEBUG
-  printf("parse_expr: %s\n", input);
+  printf("parse_value: %s\n", input);
 #endif
   // numeber
   if ('0' <= *input && *input <= '9') {
-    return mk_number_expr(strtof(input, &input));
+    return mk_number_value(strtof(input, &input));
     // symbol
   } else if (is_symbol_char()) {
     char buf[SYMBOL_LEN_MAX];
@@ -260,7 +259,7 @@ expr *parse_expr() {
       }
     }
     buf[i] = '\0';
-    return mk_symbol_expr(buf);
+    return mk_symbol_value(buf);
   } else if (*input == '"') {
     input++;
     // TODO
@@ -274,53 +273,53 @@ expr *parse_expr() {
     }
     input++;
     buf[i] = '\0';
-    return mk_string_expr(buf);
+    return mk_string_value(buf);
   } else if (*input == '#') {
     return parse_hash_literal();
   } else if (*input == '(') {
     input++;
     return parse_list();
   }
-  throw("Unexpected expression '%c' \"%s\"", *input, input);
+  throw("Unexpected valueession '%c' \"%s\"", *input, input);
 }
-expr *parse_list() {
+value *parse_list() {
 #ifdef DEBUG
   printf("parse_list: %s\n", input);
 #endif
   skip_ws();
   if (*input == ')') {
     input++;
-    return mk_empty_cell_expr();
+    return mk_empty_cell_value();
   }
-  expr *e = xmalloc(sizeof(expr));
+  value *e = xmalloc(sizeof(value));
   TYPEOF(e) = CELL;
   E_CELL(e) = xmalloc(sizeof(cell));
-  CAR(e) = parse_expr();
+  CAR(e) = parse_value();
   skip_ws();
   CDR(e) = parse_list();
   skip_ws();
   return e;
 }
-expr *parse_paren() {
+value *parse_paren() {
 #ifdef DEBUG
   printf("parse_paren: %s\n", input);
 #endif
   if (*input == '(') {
     input++;
     skip_ws();
-    expr *e = parse_list();
+    value *e = parse_list();
     skip_ws();
     return e;
   }
   throw("Unexpected token %c", *input);
 }
-expr *parse_program_list() {
+value *parse_program_list() {
 #ifdef DEBUG
   printf("parse_program_list: %s\n", input);
 #endif
   if (*input == '\0')
-    return mk_empty_cell_expr();
-  expr *e = xmalloc(sizeof(expr));
+    return mk_empty_cell_value();
+  value *e = xmalloc(sizeof(value));
   TYPEOF(e) = CELL;
   E_CELL(e) = xmalloc(sizeof(cell));
   CAR(e) = parse_paren();
@@ -329,12 +328,12 @@ expr *parse_program_list() {
   skip_ws();
   return e;
 }
-expr *parse_program(char *prg) {
+value *parse_program(char *prg) {
 #ifdef DEBUG
   printf("parse_program: %s\n", prg);
 #endif
   input = prg;
-  expr *e = parse_program_list();
+  value *e = parse_program_list();
   if (*input != '\0') {
     throw("parser error input is not empty \"%s\"", input);
   }
@@ -342,8 +341,8 @@ expr *parse_program(char *prg) {
 }
 
 // eval
-expr *eval_cell(expr *exp, frame *env);
-expr *eval(expr *exp, frame *env) {
+value *eval_cell(value *exp, frame *env);
+value *eval(value *exp, frame *env) {
   if (exp == NULL) {
     throw("eval error: exp is NULL");
   }
@@ -374,13 +373,13 @@ expr *eval(expr *exp, frame *env) {
   throw("Not implemented");
 }
 
-expr *eval_top(expr *exp, frame *env) {
+value *eval_top(value *exp, frame *env) {
   INIT_CONTINUATION();
   return eval(exp, env);
 }
 
-expr *eval_lambda(lambda *f, cell *args, frame *env);
-expr *eval_cell(expr *exp, frame *env) {
+value *eval_lambda(lambda *f, cell *args, frame *env);
+value *eval_cell(value *exp, frame *env) {
   if (exp == NULL) {
     throw("eval error: exp is NULL");
   }
@@ -392,8 +391,8 @@ expr *eval_cell(expr *exp, frame *env) {
     return exp;
   }
   // 関数を取得
-  expr *func = eval(CAR(exp), env);
-  expr *args = CDR(exp);
+  value *func = eval(CAR(exp), env);
+  value *args = CDR(exp);
   if (TYPEOF(func) == IFUNC) {
     return E_IFUNC(func)(args, env);
   } else if (TYPEOF(func) == LAMBDA) {
@@ -406,12 +405,12 @@ expr *eval_cell(expr *exp, frame *env) {
     if (cell_len(E_CELL(args)) > 1)
       throw("call/cc error: invalid number of arguments");
     if (cell_len(E_CELL(args)) == 0)
-      call_continuation(cont, mk_empty_cell_expr());
+      call_continuation(cont, mk_empty_cell_value());
     call_continuation(cont, eval(CAR(args), env));
   }
   throw("call error: not callable");
 }
-expr *eval_lambda(lambda *f, cell *args, frame *env) {
+value *eval_lambda(lambda *f, cell *args, frame *env) {
   frame *newenv = make_frame(f->env);
   cell *fargs = f->args;
   int fargc = cell_len(fargs);
@@ -428,50 +427,50 @@ expr *eval_lambda(lambda *f, cell *args, frame *env) {
 }
 
 // internal func
-expr *ifunc_add(expr *args, frame *env) {
+value *ifunc_add(value *args, frame *env) {
   float sum = 0;
   while (E_CELL(args) != NULL) {
-    expr *i = eval(CAR(args), env);
+    value *i = eval(CAR(args), env);
     if (TYPEOF(i) != NUMBER)
       throw("add error: not number");
     sum += E_NUMBER(i);
     args = CDR(args);
   }
-  return mk_number_expr(sum);
+  return mk_number_value(sum);
 }
-expr *ifunc_sub(expr *args, frame *env) {
-  expr *first = eval(CAR(args), env);
+value *ifunc_sub(value *args, frame *env) {
+  value *first = eval(CAR(args), env);
   if (TYPEOF(first) != NUMBER)
     throw("sub error: not number");
   float sum = E_NUMBER(first);
   if (cell_len(E_CELL(args)) == 1)
-    return mk_number_expr(-sum);
+    return mk_number_value(-sum);
   args = CDR(args);
   while (E_CELL(args) != NULL) {
-    expr *i = eval(CAR(args), env);
+    value *i = eval(CAR(args), env);
     if (TYPEOF(i) != NUMBER)
       throw("sub error: not number");
     sum -= E_NUMBER(i);
     args = CDR(args);
   }
-  return mk_number_expr(sum);
+  return mk_number_value(sum);
 }
-expr *ifunc_mul(expr *args, frame *env) {
+value *ifunc_mul(value *args, frame *env) {
   float sum = 1.0;
   while (E_CELL(args) != NULL) {
-    expr *i = eval(CAR(args), env);
+    value *i = eval(CAR(args), env);
     if (TYPEOF(i) != NUMBER) {
       throw("mul error: not number");
     }
     sum *= E_NUMBER(i);
     args = CDR(args);
   }
-  return mk_number_expr(sum);
+  return mk_number_value(sum);
 }
-expr *ifunc_div(expr *args, frame *env) {
+value *ifunc_div(value *args, frame *env) {
   float sum = 0;
   while (E_CELL(args) != NULL) {
-    expr *i = eval(CAR(args), env);
+    value *i = eval(CAR(args), env);
     if (TYPEOF(i) != NUMBER)
       throw("mul error: not number");
     if (E_NUMBER(i) == 0)
@@ -479,28 +478,28 @@ expr *ifunc_div(expr *args, frame *env) {
     sum /= E_NUMBER(i);
     args = CDR(args);
   }
-  return mk_number_expr(sum);
+  return mk_number_value(sum);
 }
-expr *ifunc_modulo(expr *args, frame *env) {
+value *ifunc_modulo(value *args, frame *env) {
   if (cell_len(E_CELL(args)) != 2)
     throw("modulo error: invalid number of arguments");
-  expr *a = eval(CAR(args), env);
-  expr *b = eval(CAR(CDR(args)), env);
+  value *a = eval(CAR(args), env);
+  value *b = eval(CAR(CDR(args)), env);
   if (TYPEOF(a) != NUMBER || TYPEOF(b) != NUMBER)
     throw("modulo error: not number");
   int ia = (int)E_NUMBER(a);
   int ib = (int)E_NUMBER(b);
-  return mk_number_expr(ia % ib);
+  return mk_number_value(ia % ib);
 }
-expr *ifunc_begin(expr *args, frame *env) {
-  expr *i = mk_number_expr(0);
+value *ifunc_begin(value *args, frame *env) {
+  value *i = mk_number_value(0);
   while (E_CELL(args) != NULL) {
     i = eval(CAR(args), env);
     args = CDR(args);
   }
   return i;
 }
-expr *ifunc_define(expr *args, frame *env) {
+value *ifunc_define(value *args, frame *env) {
   if (E_CELL(args) == NULL) {
     throw("define error: no symbol");
   }
@@ -512,13 +511,13 @@ expr *ifunc_define(expr *args, frame *env) {
   if (E_CELL(args) == NULL) {
     throw("define error: too few arguments");
   }
-  expr *value = eval(CAR(args), env);
+  value *value = eval(CAR(args), env);
   if (E_CELL(CDR(args)) != NULL) {
     throw("define error: too many arguments");
   }
   return define_to_env(env, symbol, value);
 }
-expr *ifunc_setbang(expr *args, frame *env) {
+value *ifunc_setbang(value *args, frame *env) {
   if (E_CELL(args) == NULL) {
     throw("define error: no symbol");
   }
@@ -530,20 +529,20 @@ expr *ifunc_setbang(expr *args, frame *env) {
   if (E_CELL(args) == NULL) {
     throw("define error: too few arguments");
   }
-  expr *value = eval(CAR(args), env);
+  value *value = eval(CAR(args), env);
   if (E_CELL(CDR(args)) != NULL) {
     throw("define error: too many arguments");
   }
   return set_to_env(env, symbol, value);
 }
-expr *ifunc_showenv(expr *args, frame *env) {
+value *ifunc_showenv(value *args, frame *env) {
   if (E_CELL(args) != NULL) {
     throw("showenv error: too many arguments");
   }
   print_frame(env);
-  return mk_number_expr(0);
+  return mk_number_value(0);
 }
-int check_args(expr *args) {
+int check_args(value *args) {
   // argsはリストでないとならない
   if (TYPEOF(args) != CELL)
     return 0;
@@ -556,55 +555,55 @@ int check_args(expr *args) {
   // 残りの要素も再帰的にチェック
   return check_args(CDR(args));
 }
-expr *ifunc_lambda(expr *args, frame *env) {
+value *ifunc_lambda(value *args, frame *env) {
   // (lambda (args) body)
   if (E_CELL(args) == NULL)
     throw("lambda error: no args");
-  expr *first = CAR(args);
+  value *first = CAR(args);
   if (!check_args(first))
     throw("lambda error: args is not list of symbol");
   cell *largs = E_CELL(first);
   if (E_CELL(CDR(args)) == NULL)
     throw("lambda error: no body");
-  expr *body = CAR(CDR(args));
+  value *body = CAR(CDR(args));
   if (E_CELL(CDR(CDR(args))) != NULL)
     throw("lambda error: too many body");
-  return mk_lambda_expr(largs, body, env);
+  return mk_lambda_value(largs, body, env);
 }
-expr *ifunc_print(expr *args, frame *env) {
+value *ifunc_print(value *args, frame *env) {
   while (E_CELL(args) != NULL) {
-    print_expr(eval(CAR(args), env));
+    print_value(eval(CAR(args), env));
     puts("");
     args = CDR(args);
   }
-  return mk_number_expr(0);
+  return mk_number_value(0);
 }
-expr *ifunc_if(expr *args, frame *env) {
+value *ifunc_if(value *args, frame *env) {
   if (cell_len(E_CELL(args)) != 2 && cell_len(E_CELL(args)) != 3)
     throw("if error: invalid number of arguments");
-  expr *cond = eval(CAR(args), env);
+  value *cond = eval(CAR(args), env);
   if (truish(cond)) {
     return eval(CAR(CDR(args)), env);
   } else {
     if (cell_len(E_CELL(args)) == 2)
-      return mk_empty_cell_expr();
+      return mk_empty_cell_value();
     return eval(CAR(CDR(CDR(args))), env);
   }
 }
-expr *ifunc_quote(expr *args, frame *env) {
+value *ifunc_quote(value *args, frame *env) {
   if (cell_len(E_CELL(args)) != 1)
     throw("quote error: invalid number of arguments");
   return CAR(args);
 }
 enum { EQ = 0, LT, LE, GT, GE };
-int comp(expr *args, frame *env, char type) {
+int comp(value *args, frame *env, char type) {
   int len = cell_len(E_CELL(args));
   if (len < 2)
     throw("comp error: too few arguments");
-  expr *car = eval(CAR(args), env);
+  value *car = eval(CAR(args), env);
   if (TYPEOF(car) != NUMBER)
     throw("comp error: not number");
-  expr *cdr;
+  value *cdr;
   int result = 1;
   for (int i = 0; i < len - 1; i++) {
     cdr = eval(CAR(CDR(args)), env);
@@ -632,62 +631,62 @@ int comp(expr *args, frame *env, char type) {
   }
   return result;
 }
-expr *ifunc_eq(expr *args, frame *env) {
-  return mk_boolean_expr(comp(args, env, EQ));
+value *ifunc_eq(value *args, frame *env) {
+  return mk_boolean_value(comp(args, env, EQ));
 }
-expr *ifunc_lt(expr *args, frame *env) {
-  return mk_boolean_expr(comp(args, env, LT));
+value *ifunc_lt(value *args, frame *env) {
+  return mk_boolean_value(comp(args, env, LT));
 }
-expr *ifunc_le(expr *args, frame *env) {
-  return mk_boolean_expr(comp(args, env, LE));
+value *ifunc_le(value *args, frame *env) {
+  return mk_boolean_value(comp(args, env, LE));
 }
-expr *ifunc_gt(expr *args, frame *env) {
-  return mk_boolean_expr(comp(args, env, GT));
+value *ifunc_gt(value *args, frame *env) {
+  return mk_boolean_value(comp(args, env, GT));
 }
-expr *ifunc_ge(expr *args, frame *env) {
-  return mk_boolean_expr(comp(args, env, GE));
+value *ifunc_ge(value *args, frame *env) {
+  return mk_boolean_value(comp(args, env, GE));
 }
-expr *ifunc_and(expr *args, frame *env) {
+value *ifunc_and(value *args, frame *env) {
   while (E_CELL(args) != NULL) {
     int i = truish(eval(CAR(args), env));
     if (i == 0)
-      return mk_boolean_expr(0);
+      return mk_boolean_value(0);
     args = CDR(args);
   }
-  return mk_boolean_expr(1);
+  return mk_boolean_value(1);
 }
-expr *ifunc_or(expr *args, frame *env) {
+value *ifunc_or(value *args, frame *env) {
   while (E_CELL(args) != NULL) {
     int i = truish(eval(CAR(args), env));
     if (i)
-      return mk_boolean_expr(1);
+      return mk_boolean_value(1);
     args = CDR(args);
   }
-  return mk_boolean_expr(0);
+  return mk_boolean_value(0);
 }
-expr *eval_list(expr *args, frame *env, expr *default_value) {
-  expr *i = default_value;
+value *eval_list(value *args, frame *env, value *default_value) {
+  value *i = default_value;
   while (E_CELL(args) != NULL) {
     i = eval_top(CAR(args), env);
     args = CDR(args);
   }
   return i;
 }
-expr *ifunc_cond(expr *args, frame *env) {
+value *ifunc_cond(value *args, frame *env) {
   while (E_CELL(args) != NULL) {
-    // (cond list* (else expr*)?)
-    // list = (expr*)
-    expr *list = CAR(args);
+    // (cond list* (else value*)?)
+    // list = (value*)
+    value *list = CAR(args);
     if (TYPEOF(list) != CELL)
       throw("cond error: not list");
-    expr *cond;
+    value *cond;
     while (E_CELL(list) != NULL) {
       if (TYPEOF(CAR(list)) == SYMBOL &&
           strcmp(E_SYMBOL(CAR(list)), "else") == 0) {
         // elseのあとをチェック
         if (E_CELL(CDR(args)) != NULL)
           throw("cond error: else is not last");
-        return eval_list(CDR(list), env, mk_number_expr(0));
+        return eval_list(CDR(list), env, mk_number_value(0));
       }
       cond = eval(CAR(list), env);
       if (truish(cond))
@@ -698,89 +697,89 @@ expr *ifunc_cond(expr *args, frame *env) {
     }
     args = CDR(args);
   }
-  return mk_empty_cell_expr();
+  return mk_empty_cell_value();
 }
-expr *ifunc_cons(expr *args, frame *env) {
+value *ifunc_cons(value *args, frame *env) {
   if (cell_len(E_CELL(args)) != 2)
     fprintf(stderr, "cons error: invalid number of arguments");
-  expr *car = eval(CAR(args), env);
-  expr *cdr = eval(CAR(CDR(args)), env);
-  return mk_cell_expr(car, cdr);
+  value *car = eval(CAR(args), env);
+  value *cdr = eval(CAR(CDR(args)), env);
+  return mk_cell_value(car, cdr);
 }
-expr *ifunc_car(expr *args, frame *env) {
+value *ifunc_car(value *args, frame *env) {
   if (cell_len(E_CELL(args)) != 1)
     throw("car error: invalid number of arguments");
-  expr *c = eval(CAR(args), env);
+  value *c = eval(CAR(args), env);
   if (TYPEOF(c) != CELL)
     throw("car error: not pair");
   return CAR(c);
 }
-expr *ifunc_cdr(expr *args, frame *env) {
+value *ifunc_cdr(value *args, frame *env) {
   if (cell_len(E_CELL(args)) != 1)
     throw("car error: invalid number of arguments");
-  expr *c = eval(CAR(args), env);
+  value *c = eval(CAR(args), env);
   if (TYPEOF(c) != CELL)
     throw("car error: not pair");
   return CDR(c);
 }
 
-expr *ifunc_rand(expr *args, frame *env) {
+value *ifunc_rand(value *args, frame *env) {
   if (cell_len(E_CELL(args)) != 0) 
     throw("random error: arg");
-  return mk_number_expr(rand());
+  return mk_number_value(rand());
 }
 
-expr *ifunc_length(expr *args, frame *env) {
+value *ifunc_length(value *args, frame *env) {
   if (cell_len(E_CELL(args)) != 1)
     throw("length error: invalid number of arguments");
-  expr *c = eval(CAR(args), env);
+  value *c = eval(CAR(args), env);
   if (TYPEOF(c) != CELL)
     throw("length error: not pair");
-  return mk_number_expr(cell_len(E_CELL(c)));
+  return mk_number_value(cell_len(E_CELL(c)));
 }
 
 // プログラムの動作をn秒停止
-expr *ifunc_sleep(expr *args, frame *env) {
+value *ifunc_sleep(value *args, frame *env) {
   if (cell_len(E_CELL(args)) != 1)
     throw("sleep error: invalid number of arguments");
-  expr *c = eval(CAR(args), env);
+  value *c = eval(CAR(args), env);
   if (TYPEOF(c) != NUMBER)
     throw("sleep error: not number");
   sleep(E_NUMBER(c));
-  return mk_number_expr(0);
+  return mk_number_value(0);
 }
 
 // main
 frame *mk_initial_env() {
   frame *env = make_frame(NULL);
-  add_kv_to_frame(env, "+", mk_ifunc_expr(ifunc_add));
-  add_kv_to_frame(env, "-", mk_ifunc_expr(ifunc_sub));
-  add_kv_to_frame(env, "*", mk_ifunc_expr(ifunc_mul));
-  add_kv_to_frame(env, "/", mk_ifunc_expr(ifunc_div));
-  add_kv_to_frame(env, "modulo", mk_ifunc_expr(ifunc_modulo));
-  add_kv_to_frame(env, "begin", mk_ifunc_expr(ifunc_begin));
-  add_kv_to_frame(env, "define", mk_ifunc_expr(ifunc_define));
-  add_kv_to_frame(env, "set!", mk_ifunc_expr(ifunc_setbang));
-  add_kv_to_frame(env, "showenv", mk_ifunc_expr(ifunc_showenv));
-  add_kv_to_frame(env, "lambda", mk_ifunc_expr(ifunc_lambda));
-  add_kv_to_frame(env, "print", mk_ifunc_expr(ifunc_print));
-  add_kv_to_frame(env, "if", mk_ifunc_expr(ifunc_if));
-  add_kv_to_frame(env, "quote", mk_ifunc_expr(ifunc_quote));
-  add_kv_to_frame(env, "=", mk_ifunc_expr(ifunc_eq));
-  add_kv_to_frame(env, "<", mk_ifunc_expr(ifunc_lt));
-  add_kv_to_frame(env, "<=", mk_ifunc_expr(ifunc_le));
-  add_kv_to_frame(env, ">", mk_ifunc_expr(ifunc_gt));
-  add_kv_to_frame(env, ">=", mk_ifunc_expr(ifunc_ge));
-  add_kv_to_frame(env, "and", mk_ifunc_expr(ifunc_and));
-  add_kv_to_frame(env, "or", mk_ifunc_expr(ifunc_or));
-  add_kv_to_frame(env, "cond", mk_ifunc_expr(ifunc_cond));
-  add_kv_to_frame(env, "cons", mk_ifunc_expr(ifunc_cons));
-  add_kv_to_frame(env, "call/cc", mk_ifunc_expr(ifunc_callcc));
-  add_kv_to_frame(env, "car", mk_ifunc_expr(ifunc_car));
-  add_kv_to_frame(env, "cdr", mk_ifunc_expr(ifunc_cdr));
-  add_kv_to_frame(env, "rand", mk_ifunc_expr(ifunc_rand));
-  add_kv_to_frame(env, "length", mk_ifunc_expr(ifunc_length));
-  add_kv_to_frame(env, "sleep", mk_ifunc_expr(ifunc_sleep));
+  add_kv_to_frame(env, "+", mk_ifunc_value(ifunc_add));
+  add_kv_to_frame(env, "-", mk_ifunc_value(ifunc_sub));
+  add_kv_to_frame(env, "*", mk_ifunc_value(ifunc_mul));
+  add_kv_to_frame(env, "/", mk_ifunc_value(ifunc_div));
+  add_kv_to_frame(env, "modulo", mk_ifunc_value(ifunc_modulo));
+  add_kv_to_frame(env, "begin", mk_ifunc_value(ifunc_begin));
+  add_kv_to_frame(env, "define", mk_ifunc_value(ifunc_define));
+  add_kv_to_frame(env, "set!", mk_ifunc_value(ifunc_setbang));
+  add_kv_to_frame(env, "showenv", mk_ifunc_value(ifunc_showenv));
+  add_kv_to_frame(env, "lambda", mk_ifunc_value(ifunc_lambda));
+  add_kv_to_frame(env, "print", mk_ifunc_value(ifunc_print));
+  add_kv_to_frame(env, "if", mk_ifunc_value(ifunc_if));
+  add_kv_to_frame(env, "quote", mk_ifunc_value(ifunc_quote));
+  add_kv_to_frame(env, "=", mk_ifunc_value(ifunc_eq));
+  add_kv_to_frame(env, "<", mk_ifunc_value(ifunc_lt));
+  add_kv_to_frame(env, "<=", mk_ifunc_value(ifunc_le));
+  add_kv_to_frame(env, ">", mk_ifunc_value(ifunc_gt));
+  add_kv_to_frame(env, ">=", mk_ifunc_value(ifunc_ge));
+  add_kv_to_frame(env, "and", mk_ifunc_value(ifunc_and));
+  add_kv_to_frame(env, "or", mk_ifunc_value(ifunc_or));
+  add_kv_to_frame(env, "cond", mk_ifunc_value(ifunc_cond));
+  add_kv_to_frame(env, "cons", mk_ifunc_value(ifunc_cons));
+  add_kv_to_frame(env, "call/cc", mk_ifunc_value(ifunc_callcc));
+  add_kv_to_frame(env, "car", mk_ifunc_value(ifunc_car));
+  add_kv_to_frame(env, "cdr", mk_ifunc_value(ifunc_cdr));
+  add_kv_to_frame(env, "rand", mk_ifunc_value(ifunc_rand));
+  add_kv_to_frame(env, "length", mk_ifunc_value(ifunc_length));
+  add_kv_to_frame(env, "sleep", mk_ifunc_value(ifunc_sleep));
   return env;
 }
 void repl() {
@@ -794,10 +793,10 @@ void repl() {
       printf("scm> ");
       continue;
     }
-    expr *program = parse_expr();
-    expr *ret = eval_top(program, environ);
+    value *program = parse_value();
+    value *ret = eval_top(program, environ);
     printf("=> ");
-    print_expr(ret);
+    print_value(ret);
     puts("");
     printf("scm> ");
   }
@@ -810,9 +809,9 @@ int main(int argc, char *argv[]) {
     else
       throw("repl must be run in tty");
   } else {
-    expr *program = parse_program(argv[1]);
+    value *program = parse_program(argv[1]);
     frame *environ = mk_initial_env();
-    eval_list(program, environ, mk_empty_cell_expr());
+    eval_list(program, environ, mk_empty_cell_value());
   }
 
   for (int i = 0; i < MEMP; i++)

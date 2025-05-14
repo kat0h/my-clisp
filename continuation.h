@@ -2,7 +2,7 @@
 #define CONTINUATION_H
 #include <setjmp.h>
 
-typedef struct Expr expr;
+typedef struct Value expr;
 typedef struct Continuation continuation;
 struct Continuation {
   void *stack;
@@ -24,13 +24,13 @@ void init_continuation(void *rbp);
     init_continuation(main_rbp);                                               \
   }
 void *get_continuation(continuation *c);
-void call_continuation(continuation *c, void *expr);
+void call_continuation(continuation *c, void *value);
 void free_continuation(continuation *c);
-expr *mk_continuation_expr(continuation *cont);
-expr *ifunc_callcc(expr *args, frame *env);
+value *mk_continuation_value(continuation *cont);
+value *ifunc_callcc(value *args, frame *env);
 
 static void *main_rbp;
 // 継続の返り値を受け渡すための変数
-static void *e_expr;
+static void *e_value;
 
 #endif
